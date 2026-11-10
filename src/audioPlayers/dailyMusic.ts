@@ -1,6 +1,7 @@
 import { Pack } from "../classes";
 import * as python from "../python";
 import { settings } from "../settings";
+import { rotationMusicNames } from "./steamMusic";
 
 // Today's date on the Deck's own clock, like "2026-11-07"
 export function getTodayKey(): string {
@@ -27,11 +28,12 @@ export function chooseDailyMusic(
   lastDate: string,
   lastPick: string
 ): DailyMusicChoice | null {
-  const musicNames = soundPacks.filter((p) => p.music).map((p) => p.name);
+  const musicNames = rotationMusicNames(soundPacks);
   if (musicNames.length === 0) return null;
 
   const today = getTodayKey();
-  const stillValid = lastPick === "None" || musicNames.includes(lastPick);
+  // A pack picked by hand today stays, even one that random picks would not choose (a Steam track)
+  const stillValid = lastPick === "None" || soundPacks.some((p) => p.music && p.name === lastPick);
   if (lastDate === today && stillValid) {
     return { pick: lastPick, date: today, isNew: false };
   }
@@ -175,7 +177,7 @@ export function chooseVaried(
 // For "New Music Every Replay": picks a music pack that was not played lately.
 // Returns null if no music packs are installed.
 export function pickReplayMusic(soundPacks: Pack[], current: string): string | null {
-  const names = soundPacks.filter((p) => p.music).map((p) => p.name);
+  const names = rotationMusicNames(soundPacks);
   if (names.length === 0) return null;
   return chooseVaried(names, current, recentMusic);
 }

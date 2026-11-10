@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from audio_utils import store_read as util_store_read, store_write as util_store_write, get_steam_path, get_pack_path, AUDIO_LOADER_VERSION, DECKY_HOME, DECKY_USER_HOME
 from audio_remoteinstall import install
+import steam_music
 
 starter_config_data = {
   "selected_pack": "Default",
@@ -185,7 +186,8 @@ class Plugin:
             return {}
 
     async def get_sound_packs(self) -> list:
-        return [x.to_dict() for x in self.soundPacks]
+        # The installed packs, then the tracks of the Steam soundtracks (see steam_music.py)
+        return [x.to_dict() for x in self.soundPacks] + list(getattr(self, "steamPacks", []))
 
     async def download_theme_from_url(self, id : str, url : str) -> dict:
         return (await install(id, url)).to_dict()
@@ -271,6 +273,15 @@ class Plugin:
             except Exception as e:
                 Log("Audio Loader - Error parsing sound pack: {}".format(e))
 
+        # Steam Music: every track of the soundtracks you own becomes a music pack
+        try:
+            tracks = await asyncio.get_event_loop().run_in_executor(None, steam_music.scan, get_steam_path(), packsDir)
+            self.steamPacks = steam_music.pack_dicts(tracks, packsDir, [p.name for p in self.soundPacks])
+            Log("Audio Loader - Steam Music: {} tracks found".format(len(self.steamPacks)))
+        except Exception as e:
+            self.steamPacks = []
+            Log("Audio Loader - Steam Music: could not look for soundtracks: {}".format(e))
+
     async def store_read(self, key : str) -> str:
         return util_store_read(key)
     
@@ -304,6 +315,7 @@ class Plugin:
 
     async def _main(self):
         self.soundPacks = []
+        self.steamPacks = []
         self.config = {
             "selected_pack": "Default", 
             "selected_music": "None",

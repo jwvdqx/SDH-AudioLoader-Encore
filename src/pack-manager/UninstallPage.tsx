@@ -1,5 +1,5 @@
 import { PanelSectionRow, Focusable, DialogButton } from "decky-frontend-lib";
-import { useEffect, useState, VFC } from "react";
+import { useEffect, useMemo, useState, VFC } from "react";
 import { FaTrash } from "react-icons/fa";
 import { AiOutlineDownload } from "react-icons/ai";
 import * as python from "../python";
@@ -12,7 +12,9 @@ import { genericGET } from "../api";
 export type LocalThemeStatus = "installed" | "outdated" | "local";
 
 export const UninstallPage: VFC = () => {
-  const { soundPacks, browseThemeList } = useGlobalState();
+  const { soundPacks: allPacks, browseThemeList } = useGlobalState();
+  // Steam soundtrack tracks are not installed packs: they cannot be uninstalled here
+  const soundPacks = useMemo(() => allPacks.filter((p) => !p.steam), [allPacks]);
 
   const [isUninstalling, setUninstalling] = useState(false);
 

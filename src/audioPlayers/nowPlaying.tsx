@@ -20,6 +20,10 @@ export function shortCredits(author: string | undefined): string {
   return credits.length > MAX_CREDITS ? credits.slice(0, MAX_CREDITS - 3).trimEnd() + "..." : credits;
 }
 
+function clip(text: string): string {
+  return text.length > MAX_CREDITS ? text.slice(0, MAX_CREDITS - 3).trimEnd() + "..." : text;
+}
+
 // Titles longer than this do not fit in the message, so they scroll
 const SCROLL_FROM_CHARS = 26;
 const SCROLL_DELAY_S = 1.2;
@@ -61,6 +65,9 @@ export function announceMusic(pack: Pack | undefined) {
   if (pack.name === lastPack && now - lastAt < REPEAT_MS) return;
   lastPack = pack.name;
   lastAt = now;
-  const { title, durationMs } = titleFor(`Now Playing: ${pack.name}`);
-  python.toast(title, shortCredits(pack.author), durationMs);
+  // A Steam soundtrack track: its title, then artist and album
+  const steam = pack.steam;
+  const { title, durationMs } = titleFor(`Now Playing: ${steam ? steam.title : pack.name}`);
+  const credits = steam ? clip(`${steam.artist} - ${steam.album}`) : shortCredits(pack.author);
+  python.toast(title, credits, durationMs);
 }

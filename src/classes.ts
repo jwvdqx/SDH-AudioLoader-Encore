@@ -1,3 +1,21 @@
+export interface SteamTrackInfo {
+  title: string;
+  artist: string;
+  album: string;
+  track: number | null;
+  disc: number | null;
+  /** URL of the cover, or "" (then a placeholder is shown) */
+  cover: string;
+  appid: string;
+  albumKey: string;
+  /** Fields taken from file, folder or Steam names instead of the tags */
+  guessed: string[];
+  /** Fields that only have a placeholder */
+  missing: string[];
+  /** Where the file really is */
+  file: string;
+}
+
 export interface Pack {
   name: string;
   description: string;
@@ -10,6 +28,8 @@ export interface Pack {
   music: boolean;
   hasIntro: boolean;
   id: string;
+  /** Only for the tracks of Steam soundtracks (Steam Music) */
+  steam?: SteamTrackInfo;
 }
 
 export interface packDbEntry {
