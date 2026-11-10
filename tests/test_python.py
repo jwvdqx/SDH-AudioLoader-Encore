@@ -1,6 +1,6 @@
 """Tests for the Python side: zip validation (pack installer) and saving settings (set_config).
 Run with:  python3 tests/test_python.py"""
-import asyncio, importlib.util, json, os, ssl, sys, tempfile, types, unittest, zipfile
+import asyncio, importlib.util, json, os, shutil, ssl, struct, sys, tempfile, types, unittest, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -97,6 +97,160 @@ class SettingsMerging(unittest.TestCase):
         c = self.read()
         self.assertTrue(c["smooth_fades"])
         self.assertEqual(c["music_volume"], 0.4)
+
+
+# ---- Steam Music (steam_music.py) ----
+
+steam_music = load("steam_music", "steam_music.py")
+
+JPEG = b"\xff\xd8\xff\xe0fakejpeg"
+
+
+def id3_frame(fid, body):
+    return fid.encode() + struct.pack(">I", len(body)) + b"\x00\x00" + body
+
+
+def mp3_with_tags(title=None, artist=None, album=None, track=None, cover=False):
+    frames = b""
+    for fid, value in (("TIT2", title), ("TPE1", artist), ("TALB", album), ("TRCK", track)):
+        if value is not None:
+            frames += id3_frame(fid, b"\x03" + value.encode("utf-8"))
+    if cover:
+        frames += id3_frame("APIC", b"\x00image/jpeg\x00\x03\x00" + JPEG)
+    size = len(frames)
+    syncsafe = bytes([(size >> 21) & 127, (size >> 14) & 127, (size >> 7) & 127, size & 127])
+    return b"ID3\x03\x00\x00" + syncsafe + frames + b"\xff\xfb" + b"\x00" * 400
+
+
+def flac_with_tags(comments):
+    vendor = b"test"
+    body = struct.pack("<I", len(vendor)) + vendor + struct.pack("<I", len(comments))
+    for c in comments:
+        c = c.encode("utf-8")
+        body += struct.pack("<I", len(c)) + c
+    streaminfo = b"\x00" * 34
+    return (b"fLaC" + bytes([0]) + len(streaminfo).to_bytes(3, "big") + streaminfo
+            + bytes([0x80 | 4]) + len(body).to_bytes(3, "big") + body)
+
+
+def write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+
+
+class SteamMusic(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="steam_")
+        self.steam = os.path.join(self.root, "Steam")
+        self.sd = os.path.join(self.root, "sdcard")
+        self.packs = os.path.join(self.root, "sounds")
+        os.makedirs(self.packs)
+        os.makedirs(os.path.join(self.sd, "steamapps", "music"))
+        write(os.path.join(self.steam, "steamapps", "libraryfolders.vdf"),
+              ('"libraryfolders"\n{\n "0" { "path" "%s" }\n "1" { "path" "%s" }\n}' % (self.steam, self.sd)).encode())
+        # A tagged soundtrack in two formats on the internal drive
+        ost = os.path.join(self.steam, "steamapps", "music", "Space Game OST")
+        write(os.path.join(ost, "MP3", "01 - Opening.mp3"),
+              mp3_with_tags("Opening", "Composer A", "Space Game Soundtrack", "1/12", cover=True))
+        write(os.path.join(ost, "FLAC", "01 - Opening.flac"),
+              flac_with_tags(["TITLE=Opening", "ARTIST=Composer A", "ALBUM=Space Game Soundtrack", "TRACKNUMBER=1"]))
+        write(os.path.join(ost, "FLAC", "02 - Battle.flac"),
+              flac_with_tags(["TITLE=Battle", "ARTIST=Composer A", "ALBUM=Space Game Soundtrack", "TRACKNUMBER=2"]))
+        # A soundtrack without any tags on the SD card, with Steam's name and picture
+        bare = os.path.join(self.sd, "steamapps", "music", "puzzle_ost")
+        write(os.path.join(bare, "03 - Boss Fight.ogg"), b"not really ogg")
+        write(os.path.join(bare, "Credits.mp3"), b"\xff\xfb" + b"\x00" * 200)
+        write(os.path.join(self.sd, "steamapps", "appmanifest_999.acf"),
+              b'"AppState"\n{\n "appid" "999"\n "name" "Puzzle Game Soundtrack"\n "installdir" "puzzle_ost"\n}')
+        write(os.path.join(self.steam, "appcache", "librarycache", "999", "abc", "library_600x900.jpg"), JPEG)
+
+    def scan(self):
+        return steam_music.scan(self.steam, self.packs)
+
+    def by_title(self, tracks):
+        return {t["title"]: t for t in tracks}
+
+    def test_tags_are_read(self):
+        t = self.by_title(self.scan())
+        self.assertEqual(t["Opening"]["artist"], "Composer A")
+        self.assertEqual(t["Opening"]["album"], "Space Game Soundtrack")
+        self.assertEqual(t["Opening"]["track"], 1)
+        self.assertEqual(t["Battle"]["track"], 2)
+        self.assertEqual(t["Opening"]["missing"], [])
+        self.assertEqual(t["Opening"]["guessed"], [])
+
+    def test_a_track_in_two_formats_is_listed_once_as_mp3(self):
+        tracks = self.scan()
+        openings = [x for x in tracks if x["title"] == "Opening"]
+        self.assertEqual(len(openings), 1)
+        self.assertTrue(openings[0]["path"].endswith(".mp3"))
+        self.assertEqual(len(tracks), 4)
+
+    def test_missing_information_is_filled_in(self):
+        t = self.by_title(self.scan())
+        boss = t["Boss Fight"]
+        self.assertEqual(boss["track"], 3)
+        self.assertEqual(boss["artist"], steam_music.PLACEHOLDER_ARTIST)
+        self.assertEqual(boss["album"], "Puzzle Game Soundtrack")  # from Steam's app manifest
+        self.assertEqual(set(boss["guessed"]), {"title", "album", "track"})
+        self.assertEqual(boss["missing"], ["artist"])
+        credits = t["Credits"]
+        self.assertIsNone(credits["track"])
+        self.assertIn("track", credits["missing"])
+
+    def test_covers_embedded_and_from_steam(self):
+        t = self.by_title(self.scan())
+        self.assertIn("/cover.jpg", t["Opening"]["cover"])
+        self.assertIn("/cover.jpg", t["Boss Fight"]["cover"])
+        saved = os.path.join(self.packs, steam_music.LINK_FOLDER, t["Opening"]["albumKey"], "cover.jpg")
+        with open(saved, "rb") as f:
+            self.assertEqual(f.read(), JPEG)
+
+    def test_tracks_are_linked_into_the_packs_folder(self):
+        for track in self.scan():
+            link = os.path.join(self.packs, steam_music.LINK_FOLDER, track["albumKey"], track["file"])
+            self.assertTrue(os.path.islink(link))
+            self.assertEqual(os.path.realpath(link), os.path.realpath(track["path"]))
+            self.assertRegex(track["file"], r"^[0-9a-f]{12}\.[a-z0-9]+$")
+
+    def test_a_second_scan_gives_the_same_result_and_cleans_up(self):
+        first = self.scan()
+        second = self.scan()
+        self.assertEqual([t["file"] for t in first], [t["file"] for t in second])
+        shutil.rmtree(os.path.join(self.sd, "steamapps", "music", "puzzle_ost"))
+        third = self.scan()
+        self.assertEqual(len(third), 2)
+        folders = [n for n in os.listdir(os.path.join(self.packs, steam_music.LINK_FOLDER)) if n != "index.json"]
+        self.assertEqual(len(folders), 1)
+
+    def test_tracks_become_music_packs_with_unique_names(self):
+        packs = steam_music.pack_dicts(self.scan(), self.packs, ["Space Game Soundtrack - Battle"])
+        names = [p["name"] for p in packs]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertIn("Space Game Soundtrack - Battle (2)", names)
+        p = packs[0]
+        self.assertTrue(p["music"])
+        self.assertTrue(p["truncatedPackPath"].startswith(steam_music.LINK_FOLDER + "/"))
+        self.assertEqual(len(p["mappings"]["menu_music.mp3"]), 1)
+
+    def test_file_names_give_number_and_title(self):
+        f = steam_music.title_from_filename
+        self.assertEqual(f("01 - Main Theme.mp3"), (1, "Main Theme"))
+        self.assertEqual(f("12. Ending.flac"), (12, "Ending"))
+        self.assertEqual(f("1-03 Disc Two Song.mp3"), (3, "Disc Two Song"))
+        self.assertEqual(f("Main_Theme.ogg"), (None, "Main Theme"))
+        self.assertEqual(f("1999.mp3"), (None, "1999"))
+
+    def test_broken_files_never_raise(self):
+        path = os.path.join(self.root, "broken.mp3")
+        write(path, b"ID3\x04\x00\x00\x7f\x7f\x7f\x7f" + b"\xff" * 50)
+        self.assertEqual(steam_music.read_tags(path)[0], {})
+        write(path.replace(".mp3", ".m4a"), b"\x00\x00\x00\x10moovjunkjunk")
+        self.assertEqual(steam_music.read_tags(path.replace(".mp3", ".m4a"))[0], {})
+
+    def test_no_steam_folder_gives_no_tracks(self):
+        self.assertEqual(steam_music.scan(os.path.join(self.root, "nothing"), self.packs), [])
 
 
 if __name__ == "__main__":

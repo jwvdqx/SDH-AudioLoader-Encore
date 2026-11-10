@@ -67,3 +67,39 @@ test("saved settings: the old 'Pure Random' switch becomes variety 0", () => {
   loadSettings({ pure_random_music: true, variety_level: 70 });
   assert.equal(settings.variety_level, 70);
 });
+
+// ---- Steam Music ----
+const { chooseDailyMusic, getTodayKey, pickReplayMusic } = require("../../src/audioPlayers/dailyMusic.ts");
+const { steamAlbums, rotationMusicNames } = require("../../src/audioPlayers/steamMusic.ts");
+
+const pack = (name, steam) => ({ name, music: true, mappings: {}, ...(steam ? { steam } : {}) });
+const track = (album, title, n) => ({ title, artist: "A", album, track: n, disc: null, cover: "", appid: "", albumKey: album, guessed: [], missing: [], file: "" });
+const library = [
+  pack("Halo - Theme"),
+  pack("Doom - E1M1"),
+  pack("OST - Two", track("OST", "Two", 2)),
+  pack("OST - One", track("OST", "One", 1)),
+  pack("Other - Song", track("Other", "Song", null)),
+];
+
+test("Steam tracks are only in the random picks when that is on", () => {
+  loadSettings({});
+  assert.deepEqual(rotationMusicNames(library), ["Halo - Theme", "Doom - E1M1"]);
+  for (let i = 0; i < 100; i++) assert.ok(!pickReplayMusic(library, "Halo - Theme").startsWith("OST"));
+  loadSettings({ steam_music_in_rotation: true });
+  assert.equal(rotationMusicNames(library).length, 5);
+  loadSettings({});
+});
+
+test("a Steam track picked by hand today stays today's music", () => {
+  loadSettings({});
+  const choice = chooseDailyMusic(library, getTodayKey(), "OST - One");
+  assert.equal(choice.pick, "OST - One");
+  assert.equal(choice.isNew, false);
+});
+
+test("Steam tracks are grouped by soundtrack, in track order", () => {
+  const albums = steamAlbums(library);
+  assert.deepEqual(albums.map((a) => a.album), ["OST", "Other"]);
+  assert.deepEqual(albums[0].tracks.map((p) => p.steam.title), ["One", "Two"]);
+});

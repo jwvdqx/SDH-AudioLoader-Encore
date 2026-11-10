@@ -1,6 +1,7 @@
 import * as python from "../python";
 import { settings } from "../settings";
 import { Pack } from "../classes";
+import { inRotation } from "./steamMusic";
 
 // A short memory of what the plugin decided lately (which music, and why). It is shown in the
 // Info tab, included in "Copy debug info", and also written to the Decky log.
@@ -40,7 +41,10 @@ export function playStats(
   count: number,
   order: "most" | "least"
 ): [string, number][] {
-  const names = soundPacks.filter((p) => p.music).map((p) => p.name);
+  // Steam tracks only count when they are in the random picks or were played
+  const names = soundPacks
+    .filter((p) => inRotation(p) || (p.music && (settings.play_counts[p.name] || 0) > 0))
+    .map((p) => p.name);
   const rows: [string, number][] = names.map((n) => [n, settings.play_counts[n] || 0]);
   rows.sort((a, b) => (order === "most" ? b[1] - a[1] : a[1] - b[1]) || a[0].localeCompare(b[0]));
   if (order === "most") return rows.filter((r) => r[1] > 0).slice(0, count);

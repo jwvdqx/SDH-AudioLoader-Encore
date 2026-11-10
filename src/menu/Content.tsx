@@ -17,6 +17,7 @@ import {
   FaPlay,
   FaSlidersH,
   FaStepForward,
+  FaSteam,
   FaVolumeUp,
 } from "react-icons/fa";
 import {
@@ -44,6 +45,8 @@ import {
   skipMusic,
   sleepTimerEndsAt,
   startSleepTimer,
+  PLACEHOLDER_COVER,
+  steamAlbums,
 } from "../audioPlayers";
 import * as python from "../python";
 import { notifySettingsChanged, updateSetting } from "../settings";
@@ -52,10 +55,11 @@ import { GlobalState, useGlobalState } from "../state/GlobalState";
 import { ACCENT, cardStyle, FocusButton, Group, Info, Note, PANEL_BORDER, Slider, smallText, showTextWindow, Toggle } from "./parts";
 import { checkUpdateOnce, forceUpdateCheck, getUpdateInfo, isNewer } from "./update";
 
-type TabId = "music" | "sounds" | "effects" | "library" | "info";
+type TabId = "music" | "steam" | "sounds" | "effects" | "library" | "info";
 
 const TABS: { id: TabId; label: string; icon: JSX.Element }[] = [
   { id: "music", label: "Music", icon: <FaMusic /> },
+  { id: "steam", label: "Steam Music", icon: <FaSteam /> },
   { id: "sounds", label: "Sounds", icon: <FaVolumeUp /> },
   { id: "effects", label: "Effects", icon: <FaSlidersH /> },
   { id: "library", label: "Library", icon: <FaBookOpen /> },
@@ -142,10 +146,23 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
         <div style={{ ...smallText, textTransform: "uppercase", letterSpacing: "0.8px", fontSize: "10px", color: ACCENT }}>
           {selectedMusic === "None" ? "No music" : paused ? "Paused" : "Now playing"}
         </div>
-        <div style={{ fontSize: "15px", fontWeight: 600, margin: "2px 0", overflowWrap: "anywhere" }}>
-          {selectedMusic === "None" ? "Music is off" : selectedMusic}
-        </div>
-        {selectedMusic !== "None" && <div style={smallText}>{shortCredits(pack?.author)}</div>}
+        {pack?.steam ? (
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", margin: "4px 0 2px" }}>
+            <Cover src={pack.steam.cover} size={44} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "15px", fontWeight: 600, overflowWrap: "anywhere" }}>{pack.steam.title}</div>
+              <div style={smallText}>{pack.steam.artist}</div>
+              <div style={smallText}>{pack.steam.album}</div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: "15px", fontWeight: 600, margin: "2px 0", overflowWrap: "anywhere" }}>
+              {selectedMusic === "None" ? "Music is off" : selectedMusic}
+            </div>
+            {selectedMusic !== "None" && <div style={smallText}>{shortCredits(pack?.author)}</div>}
+          </>
+        )}
         {gamesRunning.length > 0 && <div style={smallText}>A game is running</div>}
         {status !== "" && <div style={{ ...smallText, color: "#f0c987", opacity: 1 }}>{status}</div>}
         {settings.hide_descriptions ? null : null}
@@ -270,21 +287,23 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
     setGlobalState,
   } = g;
 
+  // Steam soundtrack tracks are in the Steam Music tab (there can be hundreds). The one that is
+  // playing is still shown here.
   const musicOptions = useMemo(
     () => [
       { label: "None", data: -1 },
       ...soundPacks
-        .filter((e) => e.music)
+        .filter((e) => e.music && (!e.steam || e.name === selectedMusic))
         .map((p, index) => ({ label: p.name, data: index }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     ],
-    [soundPacks]
+    [soundPacks, selectedMusic]
   );
   const todOptions = useMemo(
     () => [
       { label: "Not set (normal rules)", data: -1 },
       ...soundPacks
-        .filter((e) => e.music)
+        .filter((e) => e.music && !e.steam)
         .map((p, index) => ({ label: p.name, data: index }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     ],
@@ -489,6 +508,132 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
   );
 };
 
+const Cover: VFC<{ src: string; size: number }> = ({ src, size }) => {
+  const [failed, setFailed] = useState(false);
+  return (
+    <img
+      src={src && !failed ? src : PLACEHOLDER_COVER}
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, objectFit: "cover", borderRadius: "4px", flex: "0 0 auto", background: "#0003" }}
+    />
+  );
+};
+
+// Placeholders and guessed values are shown dimmed
+const dim = (on: boolean) => (on ? { opacity: 0.55, fontStyle: "italic" as const } : {});
+
+const SteamTab: VFC = () => {
+  const g = useGlobalState();
+  const settings = useSettings();
+  const { soundPacks, selectedMusic, legacyEnabled, menuMusic, gamesRunning, musicVolume, dailyRandomMusic, setGlobalState } = g;
+  const [scanning, setScanning] = useState(false);
+  const albums = useMemo(() => steamAlbums(soundPacks), [soundPacks]);
+  const trackCount = albums.reduce((n, a) => n + a.tracks.length, 0);
+
+  const play = (name: string) => {
+    if (!legacyEnabled) return;
+    python.setConfig({ selected_music: name });
+    // Picked by hand: with "New Music Every Day" on, it becomes today's music
+    if (dailyRandomMusic) {
+      const today = getTodayKey();
+      setGlobalState("dailyMusicDate", today);
+      setGlobalState("dailyMusicPick", name);
+      python.setConfig({ daily_music_date: today, daily_music_pick: name });
+    }
+    changeMenuMusic(name, menuMusic, (k, v) => setGlobalState(k, v), gamesRunning, soundPacks, musicVolume);
+  };
+
+  return (
+    <PanelSection>
+      {!legacyEnabled && <Info>Turn on Enable Legacy Features (Music tab) to play these.</Info>}
+      <Note>
+        The soundtracks you own in Steam. Download them in Steam (the soundtrack's page, or Library &gt; Soundtracks)
+        and press Scan Again. Pick a track to play it as menu music.
+      </Note>
+      <Info>
+        {trackCount === 0
+          ? "No soundtracks found."
+          : `${trackCount} track${trackCount === 1 ? "" : "s"} in ${albums.length} soundtrack${albums.length === 1 ? "" : "s"}.`}
+      </Info>
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          disabled={scanning}
+          onClick={async () => {
+            setScanning(true);
+            try {
+              await python.reloadBackend();
+            } finally {
+              setScanning(false);
+            }
+          }}
+        >
+          {scanning ? "Scanning..." : "Scan Again"}
+        </ButtonItem>
+      </PanelSectionRow>
+      <Toggle
+        label="Use in Random Picks"
+        description="Steam tracks can also be chosen by New Music Every Day, New Music Every Replay and Skip."
+        checked={settings.steam_music_in_rotation}
+        onChange={(value) => updateSetting("steam_music_in_rotation", value)}
+      />
+      {albums.map((album) => (
+        <Group key={album.key} id={`steam-${album.key}`} title={album.album} defaultCollapsed>
+          <PanelSectionRow>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", width: "100%" }}>
+              <Cover src={album.cover} size={64} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{album.album}</div>
+                <div style={smallText}>{album.artist}</div>
+                <div style={smallText}>
+                  {album.tracks.length} track{album.tracks.length === 1 ? "" : "s"}
+                </div>
+              </div>
+            </div>
+          </PanelSectionRow>
+          {album.tracks.map((p) => {
+            const t = p.steam!;
+            const playing = p.name === selectedMusic;
+            const guessed = (field: string) => t.guessed.includes(field) || t.missing.includes(field);
+            return (
+              <PanelSectionRow key={p.id}>
+                <FocusButton
+                  style={{
+                    width: "100%",
+                    minWidth: 0,
+                    padding: "6px 8px",
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "center",
+                    textAlign: "left",
+                    background: playing ? "rgba(120, 70, 190, 0.55)" : "rgba(40, 32, 70, 0.5)",
+                    border: playing ? "1px solid rgba(200, 160, 255, 0.8)" : "1px solid rgba(120, 100, 170, 0.25)",
+                    borderRadius: "6px",
+                  }}
+                  onClick={() => play(p.name)}
+                >
+                  <span style={{ ...smallText, width: "22px", flex: "0 0 auto", textAlign: "right", ...dim(guessed("track")) }}>
+                    {t.track ?? "-"}
+                  </span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: "13px", overflowWrap: "anywhere", ...dim(guessed("title")) }}>
+                      {playing && <FaPlay style={{ fontSize: "9px", marginRight: "5px" }} />}
+                      {t.title}
+                    </div>
+                    {t.artist !== album.artist || guessed("artist") ? (
+                      <div style={{ ...smallText, ...dim(guessed("artist")) }}>{t.artist}</div>
+                    ) : null}
+                  </span>
+                </FocusButton>
+              </PanelSectionRow>
+            );
+          })}
+        </Group>
+      ))}
+    </PanelSection>
+  );
+};
+
 const SoundsTab: VFC = () => {
   const { activeSound, soundPacks, soundVolume, musicVolume, selectedMusic, legacyEnabled, normalizeSounds, setGlobalState } =
     useGlobalState();
@@ -640,7 +785,7 @@ const LibraryTab: VFC = () => {
   const settings = useSettings();
   const [picked, setPicked] = useState<string>("");
   const musicNames = useMemo(
-    () => soundPacks.filter((p) => p.music).map((p) => p.name).sort((a, b) => a.localeCompare(b)),
+    () => soundPacks.filter((p) => p.music && !p.steam).map((p) => p.name).sort((a, b) => a.localeCompare(b)),
     [soundPacks]
   );
   const options = useMemo(() => musicNames.map((n, i) => ({ label: n, data: i })), [musicNames]);
@@ -743,7 +888,7 @@ const InfoTab: VFC<{ version: string }> = ({ version }) => {
       selectedMusic: g.selectedMusic,
       musicPlaying: !!g.menuMusic && !g.menuMusic.paused,
       gamesRunning: g.gamesRunning.length,
-      packCount: g.soundPacks.filter((p) => p.music).length,
+      packCount: g.soundPacks.filter((p) => p.music && !p.steam).length,
       toggles: {
         daily: g.dailyRandomMusic,
         everyReplay: g.replayRandomMusic,
@@ -751,6 +896,8 @@ const InfoTab: VFC<{ version: string }> = ({ version }) => {
         waitForMovie: g.waitForMovie,
         normalizeMusic: g.normalizeMusic,
         normalizeSounds: g.normalizeSounds,
+        steamTracks: g.soundPacks.filter((p) => p.steam).length,
+        steamInRotation: settings.steam_music_in_rotation,
         lowPass: [g.lowPassSteamMenu, g.lowPassQuickAccess, g.lowPassGameLoading, g.lowPassPopups, g.lowPassStrength],
       },
       extra: { status: limitStatusText() },
@@ -886,6 +1033,7 @@ export const Content: VFC<{ serverAPI: ServerAPI; state: GlobalState }> = ({ sta
         </PanelSectionRow>
       </PanelSection>
       {tab === "music" && <MusicTab state={state} />}
+      {tab === "steam" && <SteamTab />}
       {tab === "sounds" && <SoundsTab />}
       {tab === "effects" && <EffectsTab />}
       {tab === "library" && <LibraryTab />}
