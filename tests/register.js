@@ -19,3 +19,11 @@ function compileTypeScript(module, filename) {
 
 require.extensions[".ts"] = compileTypeScript;
 require.extensions[".tsx"] = compileTypeScript;
+
+// "decky-frontend-lib" only exists inside Steam. The tests never use it, so an empty stand-in is enough.
+const Module = require("module");
+const originalLoad = Module._load;
+Module._load = function (request, ...rest) {
+  if (request === "decky-frontend-lib") return {};
+  return originalLoad.call(this, request, ...rest);
+};

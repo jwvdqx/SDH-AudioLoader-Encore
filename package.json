@@ -1,11 +1,11 @@
 {
   "name": "sdh-audioloader-encore",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Unofficial Encore fork of Audio Loader for Steam Deck UI sounds and menu music",
   "scripts": {
     "build": "shx rm -rf dist && rollup -c",
     "watch": "rollup -c -w",
-    "test": "node --require ./tests/register.js --test tests/js/volume.test.js tests/js/music.test.js tests/js/nowPlaying.test.js && python3 tests/test_python.py"
+    "test": "node --require ./tests/register.js --test tests/js/volume.test.js tests/js/music.test.js tests/js/nowPlaying.test.js tests/js/lowpass.test.js && python3 tests/test_python.py"
   },
   "repository": {
     "type": "git",

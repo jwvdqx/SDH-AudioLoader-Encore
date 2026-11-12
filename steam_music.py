@@ -602,6 +602,8 @@ def scan(steam_path, packs_path):
                 chosen[same] = (path, ext, info, has_picture)
 
             if not chosen:
+                # Nothing playable here: do not keep an empty folder of links
+                used_albums.discard(album_key)
                 continue
 
             # Cover: embedded picture > picture file in the folder > Steam's library picture

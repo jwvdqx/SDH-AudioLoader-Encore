@@ -22,6 +22,7 @@ def load(name, filename):
 
 installer = load("audio_remoteinstall", "audio_remoteinstall.py")
 main = load("al_main", "main.py")
+steam_music = load("steam_music", "steam_music.py")
 
 
 def make_zip(names):
@@ -251,6 +252,59 @@ class SteamMusic(unittest.TestCase):
 
     def test_no_steam_folder_gives_no_tracks(self):
         self.assertEqual(steam_music.scan(os.path.join(self.root, "nothing"), self.packs), [])
+
+
+class SteamMusicScan(unittest.TestCase):
+    def make_library(self):
+        steam = tempfile.mkdtemp()
+        album = os.path.join(steam, "steamapps", "music", "Game OST", "Disc 1")
+        os.makedirs(album)
+        with open(os.path.join(album, "03 - Boss Fight.mp3"), "wb") as f:
+            f.write(b"\xff\xfb\x90\x00" * 500)
+        with open(os.path.join(album, "03 - Boss Fight.flac"), "wb") as f:
+            f.write(b"fLaC" + b"\0" * 100)
+        with open(os.path.join(steam, "steamapps", "appmanifest_5.acf"), "w") as f:
+            f.write('"AppState" { "appid" "5" "name" "Game Soundtrack" "installdir" "Game OST" }')
+        return steam
+
+    def test_tracks_are_found_filled_in_and_listed_once(self):
+        steam, packs = self.make_library(), tempfile.mkdtemp()
+        tracks = steam_music.scan(steam, packs)
+        self.assertEqual(len(tracks), 1, "the same track in MP3 and FLAC is listed once")
+        t = tracks[0]
+        self.assertEqual((t["title"], t["track"], t["album"]), ("Boss Fight", 3, "Game Soundtrack"))
+        self.assertEqual(t["artist"], "Unknown Artist")
+        self.assertTrue(t["file"].endswith(".mp3"), "the smaller MP3 is preferred")
+
+    def test_links_stay_inside_the_packs_folder_and_nothing_in_steam_changes(self):
+        steam, packs = self.make_library(), tempfile.mkdtemp()
+        before = sorted(os.listdir(os.path.join(steam, "steamapps", "music", "Game OST", "Disc 1")))
+        steam_music.scan(steam, packs)
+        base = os.path.realpath(os.path.join(packs, steam_music.LINK_FOLDER))
+        for root, _dirs, files in os.walk(base):
+            self.assertTrue(os.path.realpath(root).startswith(base))
+        after = sorted(os.listdir(os.path.join(steam, "steamapps", "music", "Game OST", "Disc 1")))
+        self.assertEqual(before, after)
+
+    def test_a_second_scan_gives_the_same_result(self):
+        steam, packs = self.make_library(), tempfile.mkdtemp()
+        first = steam_music.scan(steam, packs)
+        second = steam_music.scan(steam, packs)
+        self.assertEqual([t["file"] for t in first], [t["file"] for t in second])
+
+    def test_a_removed_soundtrack_leaves_no_tracks_and_no_empty_folder(self):
+        import shutil
+        steam, packs = self.make_library(), tempfile.mkdtemp()
+        steam_music.scan(steam, packs)
+        shutil.rmtree(os.path.join(steam, "steamapps", "music", "Game OST"))
+        os.makedirs(os.path.join(steam, "steamapps", "music", "Game OST"))
+        self.assertEqual(steam_music.scan(steam, packs), [])
+        self.assertEqual(os.listdir(os.path.join(packs, steam_music.LINK_FOLDER)), [steam_music.INDEX_FILE])
+
+    def test_no_steam_music_folder_is_fine(self):
+        steam = tempfile.mkdtemp()
+        os.makedirs(os.path.join(steam, "steamapps"))
+        self.assertEqual(steam_music.scan(steam, tempfile.mkdtemp()), [])
 
 
 if __name__ == "__main__":

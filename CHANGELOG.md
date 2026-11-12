@@ -2,6 +2,13 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.2
+
+### Changed
+- Steam Music: a soundtrack with no playable tracks no longer leaves an empty folder of links behind.
+- More automatic tests: the muffled-music filter and the Steam Music scan.
+- Project tidy-up: release notes moved to `docs/release-notes`, compiled Python files removed from the repository.
+
 ## 1.6.1
 
 ### Changed
