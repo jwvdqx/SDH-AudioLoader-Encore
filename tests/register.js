@@ -3,11 +3,19 @@
 const ts = require("typescript");
 const fs = require("fs");
 
-require.extensions[".ts"] = function (module, filename) {
+function compileTypeScript(module, filename) {
   const source = fs.readFileSync(filename, "utf8");
   const out = ts.transpileModule(source, {
     fileName: filename,
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      jsx: ts.JsxEmit.React,
+      esModuleInterop: true,
+    },
   });
   module._compile(out.outputText, filename);
-};
+}
+
+require.extensions[".ts"] = compileTypeScript;
+require.extensions[".tsx"] = compileTypeScript;

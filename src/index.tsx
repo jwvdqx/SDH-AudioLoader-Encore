@@ -52,7 +52,7 @@ import {
 } from "./pack-manager";
 import { Content } from "./menu/Content";
 import * as python from "./python";
-import { loadSettings } from "./settings";
+import { loadSettings, resolvePlayMode } from "./settings";
 import { GlobalState, GlobalStateContextProvider, useGlobalState } from "./state/GlobalState";
 
 const PackManagerRouter: VFC = () => {
@@ -244,7 +244,8 @@ export default definePlugin((serverApi: ServerAPI) => {
       const configDailyRandom = data?.daily_random_music ?? false;
       const configDailyDate = data?.daily_music_date ?? "";
       const configDailyPick = data?.daily_music_pick ?? "";
-      const configReplay = data?.random_music_every_replay ?? false;
+      // Play mode (Repeat / Shuffle / Smart Shuffle). Older builds only had the Every Replay switch.
+      const configReplay = resolvePlayMode(data) !== "repeat";
       const configWaitMovie = data?.wait_for_startup_movie ?? false;
       // Older builds (1.3.5 and before) had one "Normalize Volume" switch for both
       const oldNormalize = data?.normalize_volume === true;

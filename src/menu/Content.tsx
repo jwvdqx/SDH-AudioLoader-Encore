@@ -14,7 +14,10 @@ import {
   FaInfoCircle,
   FaMusic,
   FaPause,
+  FaMagic,
   FaPlay,
+  FaRandom,
+  FaRedo,
   FaSlidersH,
   FaStepForward,
   FaSteam,
@@ -27,6 +30,7 @@ import {
   cancelSleepTimer,
   changeMenuMusic,
   configureMusicLowPass,
+  cyclePlayMode,
   endSleepTimerPause,
   formatNotes,
   getTodayKey,
@@ -36,11 +40,14 @@ import {
   nowPlayingSettings,
   normalizeRunningMusic,
   pauseMusicSmooth,
+  peekAutoNext,
+  peekSkip,
   pickTodaysMusic,
   playStats,
   previewMusicLowPass,
   refreshEffectVolume,
   resumeMusicSmooth,
+  setPlayMode,
   shortCredits,
   skipMusic,
   sleepTimerEndsAt,
@@ -49,7 +56,7 @@ import {
   steamAlbums,
 } from "../audioPlayers";
 import * as python from "../python";
-import { notifySettingsChanged, updateSetting } from "../settings";
+import { notifySettingsChanged, PlayMode, PLAY_MODES, updateSetting } from "../settings";
 import { useSettings } from "./useSettings";
 import { GlobalState, useGlobalState } from "../state/GlobalState";
 import { ACCENT, cardStyle, FocusButton, Group, Info, Note, PANEL_BORDER, Slider, smallText, showTextWindow, Toggle } from "./parts";
@@ -123,14 +130,30 @@ const Header: VFC<{ version: string }> = ({ version }) => {
   );
 };
 
+const PLAY_MODE_LABEL: Record<PlayMode, string> = {
+  repeat: "Repeat",
+  shuffle: "Shuffle",
+  smart: "Smart Shuffle",
+};
+const PLAY_MODE_ICON: Record<PlayMode, JSX.Element> = {
+  repeat: <FaRedo />,
+  shuffle: <FaRandom />,
+  smart: <FaMagic />,
+};
+
+const formatTime = (seconds: number): string => {
+  const total = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
 const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
   const { menuMusic, selectedMusic, soundPacks, legacyEnabled, gamesRunning } = useGlobalState();
   const settings = useSettings();
   const [, setTick] = useState(0);
   const refresh = () => setTick((t) => t + 1);
-  // The status line (timers, pauses) changes on its own
+  // The progress bar and the status line (timers, pauses) change on their own
   useEffect(() => {
-    const timer = setInterval(refresh, 5000);
+    const timer = setInterval(refresh, 500);
     return () => clearInterval(timer);
   }, []);
 
@@ -139,6 +162,28 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
   const paused = !menuMusic || menuMusic.paused;
   const status = limitStatusText();
   const canControl = selectedMusic !== "None" && gamesRunning.length === 0;
+
+  // Progress bar: where the music is now (only when the length is known)
+  const duration = menuMusic?.duration ?? NaN;
+  const elapsed = menuMusic?.currentTime ?? 0;
+  const showProgress = selectedMusic !== "None" && Number.isFinite(duration) && duration > 0;
+  const percent = showProgress ? Math.min(100, (elapsed / duration) * 100) : 0;
+
+  // Up Next: what plays when this music ends (Repeat plays the same music again)
+  const mode = settings.play_mode;
+  const nextName = canControl ? peekAutoNext(soundPacks, selectedMusic) : null;
+  const nextPack = nextName ? soundPacks.find((p) => p.name === nextName) : undefined;
+  const upNext =
+    !canControl || !legacyEnabled
+      ? ""
+      : mode === "repeat"
+      ? "Up next: this music again"
+      : nextName
+      ? `Up next: ${nextPack?.steam ? `${nextPack.steam.title} - ${nextPack.steam.artist}` : nextName}`
+      : "";
+  // Skip goes to this (it can differ from Up Next in Repeat mode, or with Music by Time of Day)
+  const skipName = canControl ? peekSkip(soundPacks, selectedMusic) : null;
+  const skipHint = mode === "repeat" && skipName ? `Skip: ${skipName}` : "";
 
   return (
     <PanelSectionRow>
@@ -163,6 +208,19 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
             {selectedMusic !== "None" && <div style={smallText}>{shortCredits(pack?.author)}</div>}
           </>
         )}
+        {showProgress && (
+          <div style={{ marginTop: "8px" }}>
+            <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.16)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${percent}%`, background: ACCENT, transition: "width 0.5s linear" }} />
+            </div>
+            <div style={{ ...smallText, fontSize: "11px", display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
+              <span>{formatTime(elapsed)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+        )}
+        {upNext !== "" && <div style={{ ...smallText, marginTop: "4px", overflowWrap: "anywhere" }}>{upNext}</div>}
+        {skipHint !== "" && <div style={{ ...smallText, fontSize: "11px", overflowWrap: "anywhere" }}>{skipHint}</div>}
         {gamesRunning.length > 0 && <div style={smallText}>A game is running</div>}
         {status !== "" && <div style={{ ...smallText, color: "#f0c987", opacity: 1 }}>{status}</div>}
         {settings.hide_descriptions ? null : null}
@@ -195,6 +253,16 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
               }}
             >
               <FaStepForward />
+            </DialogButton>
+            <DialogButton
+              style={{ flex: 2, minWidth: 0, padding: "6px", display: "flex", gap: "6px", alignItems: "center", justifyContent: "center", fontSize: "12px" }}
+              onClick={() => {
+                cyclePlayMode(state);
+                setTimeout(refresh, 100);
+              }}
+            >
+              {PLAY_MODE_ICON[mode]}
+              <span style={{ whiteSpace: "nowrap" }}>{PLAY_MODE_LABEL[mode]}</span>
             </DialogButton>
           </Focusable>
         )}
@@ -278,7 +346,6 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
     dailyRandomMusic,
     dailyMusicDate,
     dailyMusicPick,
-    replayRandomMusic,
     waitForMovie,
     showNowPlaying,
     activeSound,
@@ -428,24 +495,32 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
                 }
               }}
             />
-            <Toggle
-              label="New Music Every Replay"
-              description="Every time the music starts again (when it ends, after a game closes, or after the Deck wakes up), it switches to a different music pack."
-              checked={replayRandomMusic}
-              onChange={(value) => {
-                setGlobalState("replayRandomMusic", value);
-                python.setConfig({ random_music_every_replay: value });
-              }}
-            />
-            <Slider
-              label={`Variety: ${settings.variety_level === 0 ? "Pure Random" : settings.variety_level + "%"}`}
-              description="0 is completely random, so a pack or series can come back soon. Higher avoids recent packs and packs from the same series. At 100 it avoids the last 12 packs and the last 3 series."
-              value={settings.variety_level}
-              min={0}
-              max={100}
-              step={10}
-              onChange={(value) => updateSetting("variety_level", value)}
-            />
+            <PanelSectionRow>
+              <DropdownItem
+                bottomSeparator="none"
+                menuLabel="Play Mode"
+                label="Play Mode"
+                rgOptions={PLAY_MODES.map((m, i) => ({ label: PLAY_MODE_LABEL[m], data: i }))}
+                selectedOption={PLAY_MODES.indexOf(settings.play_mode)}
+                onChange={(option) => setPlayMode(state, PLAY_MODES[option.data as number])}
+              />
+            </PanelSectionRow>
+            <Note>
+              Repeat: the music loops. Shuffle: when the music ends, or after a game closes or the Deck wakes up, a random
+              music pack plays. Smart Shuffle: the same, but it avoids recent packs and series (Variety) and plays favorites
+              more often. The button on the player card changes this too.
+            </Note>
+            {settings.play_mode === "smart" && (
+              <Slider
+                label={`Variety: ${settings.variety_level === 0 ? "Pure Random" : settings.variety_level + "%"}`}
+                description="0 is completely random, so a pack or series can come back soon. Higher avoids recent packs and packs from the same series. At 100 it avoids the last 12 packs and the last 3 series."
+                value={settings.variety_level}
+                min={0}
+                max={100}
+                step={10}
+                onChange={(value) => updateSetting("variety_level", value)}
+              />
+            )}
             <Toggle
               label="Music by Time of Day"
               description={'Chooses a music pack for the morning (5:00-11:59), afternoon (12:00-17:59) and night (18:00-4:59). It is used when the Deck starts or wakes up, and for replays. A part of the day set to "Not set" follows the normal rules.'}
@@ -463,8 +538,8 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
 
           <Group id="music-playback" title="Playback">
             <Toggle
-              label="Show Now Playing"
-              description="Shows a small message with the music pack's name and its credits whenever new music starts."
+              label="Show Now Playing Notifications"
+              description="Shows an Encore popup when a new music pack or Steam track starts. Turn this off to suppress only these Now Playing notifications; the Now Playing card and all other Steam/Decky notifications are unaffected."
               checked={showNowPlaying}
               onChange={(value) => {
                 nowPlayingSettings.enabled = value;
@@ -930,7 +1005,7 @@ const InfoTab: VFC<{ version: string }> = ({ version }) => {
       packCount: g.soundPacks.filter((p) => p.music && !p.steam).length,
       toggles: {
         daily: g.dailyRandomMusic,
-        everyReplay: g.replayRandomMusic,
+        playMode: settings.play_mode,
         nowPlaying: g.showNowPlaying,
         waitForMovie: g.waitForMovie,
         normalizeMusic: g.normalizeMusic,

@@ -103,3 +103,73 @@ test("Steam tracks are grouped by soundtrack, in track order", () => {
   assert.deepEqual(albums.map((a) => a.album), ["OST", "Other"]);
   assert.deepEqual(albums[0].tracks.map((p) => p.steam.title), ["One", "Two"]);
 });
+
+// ---- Play modes and Up Next ----
+const { resolvePlayMode } = require("../../src/settings.ts");
+const queue = require("../../src/audioPlayers/playQueue.ts");
+
+test("play mode: older saved settings become Repeat or Smart Shuffle", () => {
+  assert.equal(resolvePlayMode({}), "repeat");
+  assert.equal(resolvePlayMode({ random_music_every_replay: false }), "repeat");
+  assert.equal(resolvePlayMode({ random_music_every_replay: true }), "smart");
+  assert.equal(resolvePlayMode({ play_mode: "shuffle", random_music_every_replay: false }), "shuffle");
+  assert.equal(resolvePlayMode({ play_mode: "nonsense", random_music_every_replay: true }), "smart");
+  loadSettings({ random_music_every_replay: true });
+  assert.equal(settings.play_mode, "smart");
+  loadSettings({});
+  assert.equal(settings.play_mode, "repeat");
+});
+
+test("Shuffle ignores favorites and variety, but never picks blocked packs", () => {
+  loadSettings({ play_mode: "shuffle", favorite_music: ["Doom - E1M1"], blocked_music: ["Portal - Still Alive"] });
+  const lib = names.map((n) => pack(n));
+  const picks = many(3000, () => pickReplayMusic(lib, "Halo - Theme"));
+  assert.ok(!picks.includes("Halo - Theme"));
+  assert.ok(!picks.includes("Portal - Still Alive"));
+  const fav = picks.filter((p) => p === "Doom - E1M1").length;
+  const other = picks.filter((p) => p === "Skyrim - Dragonborn").length;
+  assert.ok(fav < other * 1.5, `favorite ${fav} vs normal ${other}: shuffle should not favor`);
+  loadSettings({});
+});
+
+test("Up Next: stays the same until something changes, and Repeat has none", () => {
+  const lib = names.map((n) => pack(n));
+  loadSettings({ play_mode: "smart" });
+  queue.invalidateQueue();
+  const first = queue.peekAutoNext(lib, "Halo - Theme");
+  assert.ok(first && first !== "Halo - Theme");
+  for (let i = 0; i < 50; i++) assert.equal(queue.peekAutoNext(lib, "Halo - Theme"), first);
+  assert.equal(queue.peekSkip(lib, "Halo - Theme"), first);
+  // a different current music: a new choice, never the current one
+  const other = queue.peekAutoNext(lib, "Doom - E1M1");
+  assert.notEqual(other, "Doom - E1M1");
+  // Repeat: no Up Next, but Skip still goes somewhere else
+  loadSettings({ play_mode: "repeat" });
+  assert.equal(queue.peekAutoNext(lib, "Halo - Theme"), null);
+  const skip = queue.peekSkip(lib, "Halo - Theme");
+  assert.ok(skip && skip !== "Halo - Theme");
+  loadSettings({});
+});
+
+test("Up Next: taking it uses it up, and a blocked pack is dropped from the queue", () => {
+  const lib = names.map((n) => pack(n));
+  loadSettings({ play_mode: "smart" });
+  queue.invalidateQueue();
+  const shown = queue.peekAutoNext(lib, "Halo - Theme");
+  assert.equal(queue.takeQueued(lib, "Halo - Theme"), shown);
+  // blocking the shown pack changes the queue key: it is never played
+  const shown2 = queue.peekAutoNext(lib, "Halo - Theme");
+  loadSettings({ play_mode: "smart", blocked_music: [shown2] });
+  for (let i = 0; i < 30; i++) assert.notEqual(queue.peekAutoNext(lib, "Halo - Theme"), shown2);
+  loadSettings({});
+});
+
+test("Up Next: Music by Time of Day decides when it has a choice", () => {
+  const lib = names.map((n) => pack(n));
+  const slots = ["tod_morning", "tod_afternoon", "tod_night"];
+  const all = {};
+  for (const s of slots) all[s] = "Portal - Still Alive";
+  loadSettings({ play_mode: "shuffle", tod_enabled: true, ...all });
+  assert.equal(queue.peekAutoNext(lib, "Halo - Theme"), "Portal - Still Alive");
+  loadSettings({});
+});

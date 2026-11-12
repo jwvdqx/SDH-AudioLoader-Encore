@@ -5,12 +5,12 @@
 Encore adds new options to the "legacy" menu music of Audio Loader (turn on **Enable Legacy Features** in the plugin menu to see them). The menu has tabs: **Music**, **Sounds**, **Effects**, **Library** and **Info**, and the settings inside are grouped (the groups open and close, and **Hide Descriptions** in the Info tab makes the menu shorter).
 
 **Music tab**
-- **Now Playing card** at the top: the current pack and its credits, with **Pause/Play** and **Skip** buttons.
+- **Now Playing card** at the top: the current pack and its credits, a **progress bar** with the time played and the length, an **Up next** line, and the **Pause/Play**, **Skip** and **play mode** buttons. The Up next music is chosen ahead of time and remembered, so it is what really plays when the music ends or when you press Skip. In Repeat mode it says the same music plays again, and a small line under it shows where Skip would go.
 - **New Music Every Day**: picks a different music pack each day. Choosing "None" keeps the music off until the next day.
-- **New Music Every Replay**: every time the music starts again (when it ends, after a game closes, or after the Deck wakes up), it switches to a different music pack.
-- **Variety** slider: 0 is completely random. Higher avoids packs played recently and packs from the same series (like several games of one franchise). At 100 it avoids the last 12 packs and the last 3 series.
+- **Play Mode** (Rotation group, and the button on the Now Playing card, which cycles through the modes): **Repeat** loops the current music. **Shuffle** is purely random: when the music ends, after a game closes, or after the Deck wakes up, a random pack plays (blocked packs are never picked, favorites get no extra weight). **Smart Shuffle** is the same, but it avoids recent packs and series (the **Variety** slider) and plays favorites more often. Skip also follows the mode. This replaces the old **New Music Every Replay** switch: if it was on, Encore starts in Smart Shuffle, which behaves exactly like before.
+- **Variety** slider (shown in Smart Shuffle): 0 is completely random. Higher avoids packs played recently and packs from the same series (like several games of one franchise). At 100 it avoids the last 12 packs and the last 3 series.
 - **Music by Time of Day**: choose a music pack for the morning (5:00-11:59), afternoon (12:00-17:59) and night (18:00-4:59). It is used when the Deck starts or wakes up, and for replays. A part of the day left on "Not set" follows the normal rules.
-- **Show Now Playing**: a small message with the music pack's name and its credits whenever new music starts. A long pack name scrolls so it can be read completely.
+- **Show Now Playing Notifications**: an Encore popup with the music pack's name and credits whenever new music starts. Turn it off to suppress only these Now Playing popups; the Now Playing player card and all other Steam/Decky notifications are unaffected. A long pack name scrolls so it can be read completely.
 - **Wait for Startup Movie**: the music waits until the startup or wake-up movie has finished.
 - **Smooth Fades**: the music fades in when it starts, fades out when a game starts or you pause it, and blends into the next music.
 - **Lower Music for Notifications**: briefly lowers the music when Steam plays a notification, message or achievement sound.
@@ -26,7 +26,7 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 - Tracks are grouped by soundtrack, with the cover, title, artist and track number. Pick a track to play it as menu music (Enable Legacy Features must be on). It then works with the other music options (Normalize Music Volume, Muffled Music, Now Playing, Smooth Fades...).
 - The information comes from the files' tags (MP3, FLAC, Ogg Vorbis/Opus, M4A). Missing information is filled in from the soundtrack's Steam name, the folder and file names (like "03 - Boss Fight"), and otherwise a placeholder ("Unknown Artist", a generic cover). Filled-in values are shown dimmed. The cover is the picture inside the files, a picture in the soundtrack folder, or Steam's own picture of the soundtrack.
 - When a soundtrack has the same track in several formats (MP3 and FLAC), it is listed once (the MP3).
-- **Use in Random Picks**: off by default, so a large soundtrack collection does not crowd out your music packs. When on, Steam tracks can be chosen by New Music Every Day, New Music Every Replay and Skip.
+- **Use in Random Picks**: off by default, so a large soundtrack collection does not crowd out your music packs. When on, Steam tracks can be chosen by New Music Every Day, Shuffle / Smart Shuffle and Skip.
 - Nothing in the Steam folders is changed: Encore only makes links to the tracks in its own folder (`homebrew/sounds/steam_music_links`), because Steam's screen can only play files from there.
 
 **Sounds tab**
@@ -47,7 +47,7 @@ Settings from older versions: if the single **Normalize Volume** switch was on, 
 
 **Music after sleep**: the menu music did not come back after the Deck woke from sleep. Encore notices the wake-up and starts the music again. It also restarts the music if it should be playing but has gone silent, and it leaves it alone while a game is running or when another plugin paused it on purpose.
 
-The toggles can be used together. With "New Music Every Day" and "New Music Every Replay" both on, the first music of a new day is the daily pick, and later replays rotate to other packs. Priority at startup and after waking: Time of Day, then Daily, then Replay.
+The toggles can be used together. With "New Music Every Day" on and a Shuffle mode chosen, the first music of a new day is the daily pick, and later replays rotate to other packs. Priority at startup and after waking: Time of Day, then Daily, then Replay.
 
 The two menu toggles of the low-pass filter read which side menu Steam has open. The game loading toggle uses Steam's game launch events; when the game process starts, the filter stays on until the music has stopped (at most 4 seconds), so the music is never heard unfiltered for a moment before it cuts. The pop-up toggle listens for Steam's "dialog opened/closed" and notification sounds and also looks for dialogs on the screen.
 
@@ -60,7 +60,7 @@ Encore is used and tested on one Steam Deck by its author, mainly the daily togg
 1. Install, turn on **Enable Legacy Features**, pick a music pack. Music plays.
 2. Open the **Info** tab: the version is shown. Press **Show Debug Info**.
 3. **Skip** (Now Playing card) switches to another pack.
-4. Turn on **New Music Every Replay**, start and close a game: different music plays afterwards.
+4. Set **Play Mode** to Shuffle or Smart Shuffle (or press the mode button on the card), start and close a game: different music plays afterwards. The **Up next** line shows what comes next, and **Skip** plays exactly that. The progress bar moves while music plays. In Repeat the music loops.
 5. Put the Deck to sleep and wake it: the music comes back.
 6. **Effects** tab: turn on **Steam Menu**, press the Steam button: the music is muffled. Same for **Quick Access Menu (...)**, **Game Loading** and **Pop-ups and Notifications** (for example the "exit game?" confirmation box).
 7. Turn on **Smooth Fades**: music fades in when it starts.

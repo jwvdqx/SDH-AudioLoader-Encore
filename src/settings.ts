@@ -2,7 +2,22 @@ import * as python from "./python";
 
 // The newer settings (1.3.0 and later) live here, in one place. Each key is also the name used in
 // the config file. The older settings are still kept in the global state.
+/** How the music moves on: repeat the same music, random order, or random with variety and favorites. */
+export type PlayMode = "repeat" | "shuffle" | "smart";
+export const PLAY_MODES: PlayMode[] = ["repeat", "shuffle", "smart"];
+
+/**
+ * The saved play mode. Builds before 1.6.0 only had the "New Music Every Replay" switch: when it
+ * was on, the music was picked with variety and favorites, which is what Smart Shuffle is.
+ */
+export function resolvePlayMode(d: any): PlayMode {
+  if (PLAY_MODES.includes(d?.play_mode)) return d.play_mode;
+  return d?.random_music_every_replay === true ? "smart" : "repeat";
+}
+
 export interface Settings {
+  /** Repeat, Shuffle or Smart Shuffle. Anything but Repeat plays to the end and then picks new music. */
+  play_mode: PlayMode;
   /** 0 = completely random, 100 = strictest variety (avoid recent packs and series). */
   variety_level: number;
   smooth_fades: boolean;
@@ -29,6 +44,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  play_mode: "repeat",
   variety_level: 100,
   smooth_fades: false,
   duck_notifications: false,
@@ -75,6 +91,7 @@ export function loadSettings(data: any): void {
   const d = data || {};
   // Older builds (1.2.5 - 1.2.8) had a "Pure Random Music" switch: that is variety 0 now
   const legacyPureRandom = d.pure_random_music === true;
+  settings.play_mode = resolvePlayMode(d);
   settings.variety_level = clampNumber(
     d.variety_level ?? (legacyPureRandom ? 0 : DEFAULT_SETTINGS.variety_level),
     0,

@@ -114,7 +114,7 @@ export function changeMenuMusic(
       playAndLoopMenuMusic();
     }
 
-    // "Show Now Playing": tell which pack the music comes from
+    // Optional Encore-only Now Playing toast (separate from the persistent Now Playing card).
     announceMusic(currentPack);
     rememberMusic(currentPack?.name);
     // "Smooth Fades": the new music rises from silence

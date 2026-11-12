@@ -4,6 +4,7 @@ export * from "./loudness";
 export * from "./movieWait";
 export * from "./nowPlaying";
 export * from "./musicGuard";
+export * from "./playQueue";
 export * from "./lowPass";
 export * from "./fade";
 export * from "./limits";

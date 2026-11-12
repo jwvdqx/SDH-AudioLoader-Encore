@@ -3,11 +3,13 @@ import * as python from "../python";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
 import { getTodayKey, pickReplayMusic, pickTodaysMusic, timeOfDayPack } from "./dailyMusic";
 import { endSleepTimerPause } from "./limits";
+import { invalidateQueue, takeQueued, takeSkip } from "./playQueue";
+import { PlayMode, PLAY_MODES, settings, updateSetting } from "../settings";
 import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v1.5.1";
+export const BUILD_TAG = "v1.6.1";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -63,7 +65,7 @@ export function playRandomMusic(state: GlobalState): boolean {
   if (menuMusicControl.pausedByLimit !== null) return false;
   // "Music by Time of Day" decides the music for this part of the day, when it has a choice
   const timePick = timeOfDayPack(s.soundPacks);
-  const pick = timePick ?? pickReplayMusic(s.soundPacks, s.selectedMusic);
+  const pick = timePick ?? takeQueued(s.soundPacks, s.selectedMusic);
   if (!pick) return false;
   note(timePick ? `Music for the replay (time of day): ${pick}` : `New music for the replay: ${pick}`);
   // Remember what is playing now, so the next start (for example coming back from Desktop Mode)
@@ -85,7 +87,7 @@ export function playRandomMusic(state: GlobalState): boolean {
 export function skipMusic(state: GlobalState): boolean {
   const s = state.getPublicState();
   if (!s.legacyEnabled || s.gamesRunning.length > 0 || s.selectedMusic === "None") return false;
-  const pick = pickReplayMusic(s.soundPacks, s.selectedMusic);
+  const pick = takeSkip(s.soundPacks, s.selectedMusic);
   if (!pick) return false;
   note(`Skipped to: ${pick}`);
   python.setConfig({ selected_music: pick });
@@ -105,6 +107,25 @@ export function skipMusic(state: GlobalState): boolean {
     s.musicVolume
   );
   return true;
+}
+
+// Changes how the music moves on (Repeat, Shuffle, Smart Shuffle). "replayRandomMusic" and the
+// "random_music_every_replay" key are kept in step, because the rest of the player still uses them.
+export function setPlayMode(state: GlobalState, mode: PlayMode): void {
+  updateSetting("play_mode", mode);
+  const on = mode !== "repeat";
+  state.setGlobalState("replayRandomMusic", on);
+  python.setConfig({ random_music_every_replay: on });
+  invalidateQueue();
+  // Repeat loops the music and the other modes let it play to the end: apply it right now
+  watchForReplay(state, state.getPublicState().menuMusic);
+  note(`Play mode: ${mode}`);
+}
+
+export function cyclePlayMode(state: GlobalState): PlayMode {
+  const next = PLAY_MODES[(PLAY_MODES.indexOf(settings.play_mode) + 1) % PLAY_MODES.length];
+  setPlayMode(state, next);
+  return next;
 }
 
 const hooked = new WeakSet<object>();

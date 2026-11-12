@@ -1,6 +1,6 @@
 import { Pack } from "../classes";
 import * as python from "../python";
-import { settings } from "../settings";
+import { PlayMode, settings } from "../settings";
 import { rotationMusicNames } from "./steamMusic";
 
 // Today's date on the Deck's own clock, like "2026-11-07"
@@ -174,11 +174,24 @@ export function chooseVaried(
   return weightedPick(group, packWeight, rnd);
 }
 
-// For "New Music Every Replay": picks a music pack that was not played lately.
-// Returns null if no music packs are installed.
-export function pickReplayMusic(soundPacks: Pack[], current: string): string | null {
+// Picks the next music pack. Returns null if no music packs are installed.
+// - Shuffle: purely random (blocked packs are still never picked).
+// - Smart Shuffle (and Repeat, when the Skip button is pressed): avoids packs and series played
+//   lately (Variety) and plays favorites more often.
+export function pickReplayMusic(
+  soundPacks: Pack[],
+  current: string,
+  mode: PlayMode = settings.play_mode
+): string | null {
   const names = rotationMusicNames(soundPacks);
   if (names.length === 0) return null;
+  if (mode === "shuffle") {
+    return chooseVaried(names, current, [], Math.random, {
+      variety: 0,
+      favorites: [],
+      blocked: settings.blocked_music,
+    });
+  }
   return chooseVaried(names, current, recentMusic);
 }
 

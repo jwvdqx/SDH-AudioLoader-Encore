@@ -2,6 +2,43 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.1
+
+### Changed
+- Renamed **Show Now Playing** to **Show Now Playing Notifications** and clarified its scope.
+- Turning this option off suppresses only Encore's track-change Now Playing popups. The persistent Now Playing card remains visible, and unrelated Steam/Decky notifications are unaffected.
+- The existing `show_now_playing` setting is retained, so saved preferences migrate without changes.
+
+## 1.6.0
+
+### Added
+- **Progress bar** on the Now Playing card: time played, length and a bar. It is only shown when the music's length is known.
+- **Up next** on the Now Playing card. The next music is now chosen ahead of time and remembered, so what
+  the card shows is what plays when the music ends and what **Skip** plays. The choice is dropped when
+  the music, the play mode, Variety, favorites, blocked packs or the installed packs change.
+- **Play Mode** with three modes, as a button on the Now Playing card (cycles) and a dropdown in the
+  Rotation group:
+  - **Repeat**: loops the current music.
+  - **Shuffle**: purely random. Blocked packs are never picked; favorites and Variety are ignored.
+  - **Smart Shuffle**: random with Variety (avoids recent packs and series) and favorites. This is how
+    "New Music Every Replay" always worked.
+- Tests for the play modes, the settings migration and Up next.
+
+### Changed
+- **"New Music Every Replay" is replaced by Play Mode.** Saved settings are migrated: if the switch was on
+  you start in Smart Shuffle (same behavior as before), otherwise in Repeat. The old
+  `random_music_every_replay` key is still written, so nothing else changes.
+- The **Variety** slider is only shown in Smart Shuffle (Shuffle ignores it).
+- **Skip** now follows the play mode and uses the Up next choice (it used to always pick a new random
+  pack). In Repeat mode it still goes to a different pack. With **Music by Time of Day** on, Skip goes to the
+  chosen time-of-day pack when that is a different one.
+- The Now Playing card refreshes twice a second (it was every 5 seconds) for the progress bar.
+- New settings key: `play_mode` (`repeat`, `shuffle` or `smart`). **Copy Debug Info** shows the play mode.
+
+### Known limits
+- The progress bar is display only (no seeking).
+- The progress bar shows the position in the current file; a pack's intro counts as its own part.
+
 ## 1.5.1
 
 ### Added

@@ -1,7 +1,8 @@
 import { Pack } from "../classes";
 import * as python from "../python";
 
-// "Show Now Playing": a small on-screen message when new music starts
+// "Show Now Playing Notifications": an Encore-only toast when new music starts.
+// This setting must not gate the Now Playing card or any other Decky/Steam notifications.
 export const nowPlayingSettings = { enabled: false };
 
 const MAX_CREDITS = 60;
