@@ -2,6 +2,7 @@ import json, tempfile, asyncio
 import ssl
 import urllib.request
 import shutil
+import time
 import os, sys
 from logging import getLogger
 
@@ -247,7 +248,7 @@ class Plugin:
         self.soundPacks.remove(pack)
         return Result(True).to_dict()
 
-    async def parse_packs(self):
+    async def parse_packs(self, force_steam: bool = False):
         packsDir = get_pack_path()
         self.soundPacks = []
         possiblePacks = [str(p) for p in os.listdir(packsDir)]
@@ -276,13 +277,20 @@ class Plugin:
             except Exception as e:
                 Log("Audio Loader - Error parsing sound pack: {}".format(e))
 
-        # Steam Music: every track of the soundtracks you own becomes a music pack
+        # Steam Music: every track of the soundtracks you own becomes a music pack. Looking through the
+        # Steam folders (an SD card can be slow) is done at most every 30 seconds, because this method
+        # runs every time a pack list is opened; "Scan Again" forces it.
         try:
-            tracks = await asyncio.get_event_loop().run_in_executor(None, steam_music.scan, get_steam_path(), packsDir)
-            self.steamPacks = steam_music.pack_dicts(tracks, packsDir, [p.name for p in self.soundPacks])
-            Log("Audio Loader - Steam Music: {} tracks found".format(len(self.steamPacks)))
+            now = time.monotonic()
+            if steam_music.scan_due(getattr(self, "steamScannedAt", None), now, force_steam):
+                self.steamTracks = await asyncio.get_event_loop().run_in_executor(None, steam_music.scan, get_steam_path(), packsDir)
+                self.steamScannedAt = time.monotonic()
+                Log("Audio Loader - Steam Music: {} tracks found".format(len(self.steamTracks)))
+            self.steamPacks = steam_music.pack_dicts(getattr(self, "steamTracks", []), packsDir, [p.name for p in self.soundPacks])
         except Exception as e:
+            self.steamTracks = []
             self.steamPacks = []
+            self.steamScannedAt = None
             Log("Audio Loader - Steam Music: could not look for soundtracks: {}".format(e))
 
     async def store_read(self, key : str) -> str:
@@ -319,6 +327,8 @@ class Plugin:
     async def _main(self):
         self.soundPacks = []
         self.steamPacks = []
+        self.steamTracks = []
+        self.steamScannedAt = None
         self.config = {
             "selected_pack": "Default", 
             "selected_music": "None",

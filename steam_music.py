@@ -34,6 +34,15 @@ MAX_DEPTH = 4
 # Tags bigger than this are not read (a huge embedded picture)
 MAX_TAG_BYTES = 16 * 1024 * 1024
 
+# Looking through the Steam folders is not repeated more often than this, unless it is forced
+SCAN_MIN_GAP = 30
+
+
+def scan_due(last_scan, now, force=False, min_gap=SCAN_MIN_GAP):
+    """Is it time to look through the Steam folders again? (never scanned, forced, or long enough ago)"""
+    return bool(force) or last_scan is None or now - last_scan >= min_gap or now < last_scan
+
+
 PLACEHOLDER_ARTIST = "Unknown Artist"
 PLACEHOLDER_ALBUM = "Unknown Album"
 PLACEHOLDER_TITLE = "Unknown Track"

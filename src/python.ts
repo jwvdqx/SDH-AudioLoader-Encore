@@ -73,8 +73,9 @@ export function getAndSetSoundPacks(): Promise<any> {
 }
 
 // getSoundPacks just fetches the packs already stored in python memory, you need to call this reload function to re-fetch the folder list
-export function reloadBackend(): Promise<void> {
-  return server!.callPluginMethod("parse_packs", {}).then(() => {
+// The Steam soundtracks are only looked up again every 30 seconds, unless forceSteam is true ("Scan Again")
+export function reloadBackend(forceSteam: boolean = false): Promise<void> {
+  return server!.callPluginMethod("parse_packs", { force_steam: forceSteam }).then(() => {
     getAndSetSoundPacks();
   });
 }

@@ -301,6 +301,29 @@ class SteamMusicScan(unittest.TestCase):
         self.assertEqual(steam_music.scan(steam, packs), [])
         self.assertEqual(os.listdir(os.path.join(packs, steam_music.LINK_FOLDER)), [steam_music.INDEX_FILE])
 
+    def test_the_steam_folders_are_not_scanned_again_too_soon(self):
+        due = steam_music.scan_due
+        self.assertTrue(due(None, 100), "never scanned yet")
+        self.assertFalse(due(100, 110), "10 s later: too soon")
+        self.assertTrue(due(100, 131), "more than 30 s later")
+        self.assertTrue(due(100, 105, force=True), "Scan Again always scans")
+        self.assertTrue(due(100, 50), "a clock that went backwards scans again")
+
+    def test_opening_pack_lists_repeatedly_scans_steam_only_once(self):
+        calls = []
+        real_scan = main.steam_music.scan
+        main.steam_music.scan = lambda steam, packs: (calls.append(1) or [])
+        try:
+            plugin = main.Plugin
+            plugin.steamScannedAt = None
+            for _ in range(3):
+                asyncio.run(plugin.parse_packs(plugin))
+            self.assertEqual(len(calls), 1, "three quick reloads, one scan")
+            asyncio.run(plugin.parse_packs(plugin, True))
+            self.assertEqual(len(calls), 2, "a forced reload scans again")
+        finally:
+            main.steam_music.scan = real_scan
+
     def test_no_steam_music_folder_is_fine(self):
         steam = tempfile.mkdtemp()
         os.makedirs(os.path.join(steam, "steamapps"))

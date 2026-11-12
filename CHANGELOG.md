@@ -2,6 +2,16 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.4
+
+### Changed
+- **Faster pack lists:** opening a pack list (the Sound Pack dropdown, the Pack Manager pages) no longer
+  looks through all Steam soundtrack folders every time. It is done at most every 30 seconds; **Scan Again**
+  (Steam Music tab) always scans. This matters most when soundtracks are on a slow SD card.
+- The microphone watcher can no longer get stuck if Steam never answers one reading.
+- A wording fix in the Steam Music tab (it still named the old "New Music Every Replay").
+- Tests for the scan timing.
+
 ## 1.6.3
 
 ### Changed

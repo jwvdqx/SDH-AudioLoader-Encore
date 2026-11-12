@@ -637,7 +637,7 @@ const SteamTab: VFC = () => {
           onClick={async () => {
             setScanning(true);
             try {
-              await python.reloadBackend();
+              await python.reloadBackend(true);
             } finally {
               setScanning(false);
             }
@@ -648,7 +648,7 @@ const SteamTab: VFC = () => {
       </PanelSectionRow>
       <Toggle
         label="Use in Random Picks"
-        description="Steam tracks can also be chosen by New Music Every Day, New Music Every Replay and Skip."
+        description="Steam tracks can also be chosen by New Music Every Day, Shuffle / Smart Shuffle and Skip."
         checked={settings.steam_music_in_rotation}
         onChange={(value) => updateSetting("steam_music_in_rotation", value)}
       />

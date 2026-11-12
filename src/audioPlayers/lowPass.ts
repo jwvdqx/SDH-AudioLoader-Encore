@@ -357,6 +357,7 @@ export function startMusicLowPassContextMonitor(): () => void {
   checkMenus();
 
   let micBusy = false;
+  let micBusySince = 0;
   const pollMic = () => {
     if (!settings.microphone) {
       lastMicSignature = undefined;
@@ -364,8 +365,10 @@ export function startMusicLowPassContextMonitor(): () => void {
       setContext("microphone", false);
       return;
     }
-    if (micBusy) return;
+    // A reading that never comes back must not stop the watching for good
+    if (micBusy && Date.now() - micBusySince < 5000) return;
     micBusy = true;
+    micBusySince = Date.now();
     readMicSignature()
       .then((signature) => feedMicrophoneState(signature))
       .catch(() => {})
