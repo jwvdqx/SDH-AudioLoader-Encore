@@ -866,7 +866,7 @@ const EffectsTab: VFC = () => {
         />
         <Toggle
           label="Microphone"
-          description="While the microphone is on (not muted). Experimental: check Info > Show Debug Info if it does nothing."
+          description="For a moment when the microphone is switched on or off, or its volume changes. Experimental: check Info > Show Debug Info if it does nothing."
           checked={lowPassMicrophone}
           onChange={(value) => {
             setGlobalState("lowPassMicrophone", value);

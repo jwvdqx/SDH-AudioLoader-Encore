@@ -78,3 +78,49 @@ test("other Steam sounds change nothing", async () => {
   assert.equal(lp.shouldFilter(), false);
   lp.configureMusicLowPass(base);
 });
+
+// ---- microphone: a change of the input side muffles the music for a moment ----
+const devices = (inputVolume, extra = {}) => ({
+  activeOutputDeviceId: 1, activeInputDeviceId: 2, overrideOutputDeviceId: -1, overrideInputDeviceId: -1,
+  vecDevices: [
+    { id: 1, sName: "Speakers", bHasOutput: true, bHasInput: false, bIsDefaultOutputDevice: true, bIsDefaultInputDevice: false, flOutputVolume: 0.7, flInputVolume: 0 },
+    { id: 2, sName: "Microphone", bHasOutput: false, bHasInput: true, bIsDefaultOutputDevice: false, bIsDefaultInputDevice: true, flOutputVolume: 0, flInputVolume: inputVolume, ...extra },
+  ],
+});
+
+test("microphone: the signature ignores speakers and changes with the input", () => {
+  const a = lp.micSignature(devices(0.8));
+  assert.equal(lp.micSignature(devices(0.8)), a, "the same state gives the same text");
+  assert.notEqual(lp.micSignature(devices(0)), a, "volume (or mute) changes it");
+  assert.notEqual(lp.micSignature(devices(0.8, { bMuted: true })), a, "a mute flag changes it");
+  const speakersChanged = devices(0.8);
+  speakersChanged.vecDevices[0].flOutputVolume = 0.2;
+  assert.equal(lp.micSignature(speakersChanged), a, "output volume is not the microphone");
+  assert.equal(lp.micSignature(undefined), undefined);
+});
+
+test("microphone: music is muffled for a moment after a change, never while nothing changes", async () => {
+  lp.configureMusicLowPass({ ...base, microphone: true });
+  lp.feedMicrophoneState(lp.micSignature(devices(0.8)));
+  assert.equal(lp.shouldFilter(), false, "the first reading is only the starting point");
+  lp.feedMicrophoneState(lp.micSignature(devices(0.8)));
+  assert.equal(lp.shouldFilter(), false, "no change, no filter");
+  lp.feedMicrophoneState(lp.micSignature(devices(0)));
+  assert.equal(lp.shouldFilter(), true, "microphone switched off: muffled");
+  await tick(1000);
+  assert.equal(lp.shouldFilter(), true);
+  await tick(1000);
+  assert.equal(lp.shouldFilter(), false, "ends by itself after 1.5 s");
+  lp.feedMicrophoneState(lp.micSignature(devices(0.8)));
+  assert.equal(lp.shouldFilter(), true, "microphone switched on: muffled again");
+  lp.configureMusicLowPass(base);
+  assert.equal(lp.shouldFilter(), false, "turning the toggle off ends it");
+  await tick(10_000);
+});
+
+test("microphone: a missing reading changes nothing", () => {
+  lp.configureMusicLowPass({ ...base, microphone: true });
+  lp.feedMicrophoneState(undefined);
+  assert.equal(lp.shouldFilter(), false);
+  lp.configureMusicLowPass(base);
+});

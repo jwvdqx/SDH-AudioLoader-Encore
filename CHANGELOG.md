@@ -2,6 +2,18 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.3
+
+### Changed
+- **Muffled Music: Microphone** was rebuilt. The old version looked for a "muted" flag that Steam does not
+  provide, so it most likely never worked. Now it reads the input side of Steam's audio devices twice a
+  second (and right away when Steam announces a device or volume change). When something there changes
+  (the microphone is switched on or off, muted, its volume or the chosen input changes), the music is
+  muffled for 1.5 seconds, like the Volume toggle. It can never stay on by itself.
+- The first line in the Decky log now shows what Steam reports ("reading the microphone works (...)"),
+  to help if it still does nothing.
+- Tests for the microphone detection.
+
 ## 1.6.2
 
 ### Changed

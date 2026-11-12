@@ -15,7 +15,7 @@ import {
 
 // Music low-pass filter ("muffled music"): the menu music gets a low-pass filter while a Steam menu,
 // the Quick Access (...) menu or a pop-up (confirmation box, notification) is open, while the volume is
-// being changed, while the microphone is on, or while a game is loading. Only Encore's own menu music is filtered. Steam's sound effects and the game's sound
+// being changed, for a moment when the microphone is switched on or off, or while a game is loading. Only Encore's own menu music is filtered. Steam's sound effects and the game's sound
 // are not touched. The filter lives in the music's Web Audio chain (musicGraph.ts).
 
 export interface MusicLowPassSettings {
@@ -58,8 +58,11 @@ const NOTIFICATION_MS = 3500;
 // The filter stays on for a moment after the last change, so it does not flutter while you press.
 const VOLUME_SOUNDS = new Set(["deck_ui_volume.wav"]);
 const VOLUME_HOLD_MS = 1500;
-// Microphone: Steam has no simple event for this, so the state is read about once a second
-const MIC_POLL_MS = 1000;
+// Microphone: Steam has no "recording started / stopped" event. The input side of Steam's audio devices
+// is read twice a second, and when something changes there (the microphone is switched on or off,
+// muted, its volume or the chosen input changes) the music is muffled for a moment, like the volume.
+const MIC_POLL_MS = 500;
+const MIC_HOLD_MS = 1500;
 // A dialog that was opened (by its sound) but never closed ends by itself after this long
 const POPUP_FAILSAFE_MS = 2 * 60 * 1000;
 // When dialogs can be seen on the screen, a dialog that is gone this long counts as closed
@@ -89,7 +92,8 @@ let dialogSeenEver = false;
 let dialogGoneSince = 0;
 // Volume / microphone state
 let volumeUntil = 0;
-let micActive = false;
+let micUntil = 0;
+let lastMicSignature: string | undefined;
 
 function anyEnabled(): boolean {
   return (
@@ -210,44 +214,45 @@ function checkVolume(): void {
   setContext("volume", volumeUntil > Date.now());
 }
 
-// Reads whether the microphone is on (not muted) from Steam's audio devices.
-// Steam's device objects are not documented, so this looks for the usual field names.
-const MUTE_KEYS = ["bMuted", "bIsMuted", "bMute", "muted", "isMuted"];
-const INPUT_KEYS = ["bIsInput", "bInput", "bIsSource", "bCapture", "bIsCapture"];
-const DEFAULT_KEYS = ["bIsDefault", "bDefault", "isDefault"];
+// A short text that changes when anything about the microphone changes (the input devices, which
+// one is the default, its volume, and any mute flag Steam may give). Steam's own typings list
+// "vecDevices" with "bHasInput", "bIsDefaultInputDevice" and "flInputVolume".
+export function micSignature(result: any): string | undefined {
+  if (!result || typeof result !== "object") return undefined;
+  const devices: any[] = Array.isArray(result.vecDevices) ? result.vecDevices : [];
+  const parts: string[] = [`active:${result.activeInputDeviceId}`, `override:${result.overrideInputDeviceId}`];
+  for (const dev of devices) {
+    if (!dev || dev.bHasInput !== true) continue;
+    const flags = Object.keys(dev)
+      .filter((k) => /mute/i.test(k) && typeof dev[k] === "boolean")
+      .sort()
+      .map((k) => `${k}=${dev[k]}`);
+    const volume = Number(dev.flInputVolume);
+    parts.push([dev.id, dev.bIsDefaultInputDevice ? "default" : "", Number.isFinite(volume) ? volume.toFixed(2) : "?", ...flags].join(","));
+  }
+  return parts.join("|");
+}
+
+/** Call with the latest microphone signature. A change muffles the music for a moment. */
+export function feedMicrophoneState(signature: string | undefined): void {
+  if (signature === undefined) return;
+  // The first reading is only the starting point
+  if (lastMicSignature !== undefined && signature !== lastMicSignature) micUntil = Date.now() + MIC_HOLD_MS;
+  lastMicSignature = signature;
+  checkMic();
+}
+
+function checkMic(): void {
+  setContext("microphone", micUntil > Date.now());
+}
+
 let micLogged = false;
 
-function pickBool(obj: any, keys: string[]): boolean | undefined {
-  for (const key of keys) if (typeof obj?.[key] === "boolean") return obj[key];
-  return undefined;
-}
-
-function collectDevices(result: any): { dev: any; byKey: boolean }[] {
-  const out: { dev: any; byKey: boolean }[] = [];
-  const visit = (value: any, keyName: string, depth: number) => {
-    if (depth > 3 || !value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      const byKey = /input|source|capture|mic/i.test(keyName);
-      for (const item of value) if (item && typeof item === "object" && !Array.isArray(item)) out.push({ dev: item, byKey });
-    } else {
-      for (const [k, v] of Object.entries(value)) visit(v, k, depth + 1);
-    }
-  };
-  visit(result, "", 0);
-  return out;
-}
-
-async function readMicActive(): Promise<boolean | undefined> {
+async function readMicSignature(): Promise<string | undefined> {
   const audio = (SteamClient as any)?.System?.Audio;
   if (typeof audio?.GetDevices !== "function") return undefined;
   const result = await audio.GetDevices();
-  const inputs = collectDevices(result).filter((d) => d.byKey || pickBool(d.dev, INPUT_KEYS) === true);
-  let state: boolean | undefined;
-  if (inputs.length) {
-    const chosen = inputs.find((d) => pickBool(d.dev, DEFAULT_KEYS) === true) ?? inputs[0];
-    const muted = pickBool(chosen.dev, MUTE_KEYS);
-    if (muted !== undefined) state = !muted;
-  }
+  const signature = micSignature(result);
   if (!micLogged) {
     micLogged = true;
     let sample = "";
@@ -257,12 +262,12 @@ async function readMicActive(): Promise<boolean | undefined> {
       sample = "(not printable)";
     }
     python.logEvent(
-      state === undefined
-        ? `Low-pass filter: could not read the microphone state, the microphone option will not work. Audio API: ${Object.keys(audio).join(",")} Devices: ${sample}`
-        : "Low-pass filter: reading the microphone state works"
+      signature === undefined
+        ? `Low-pass filter: could not read the audio devices, the microphone option will not work. Audio API: ${Object.keys(audio).join(",")}`
+        : `Low-pass filter: reading the microphone works (${signature}). Devices: ${sample}`
     );
   }
-  return state;
+  return signature;
 }
 
 // Is a dialog (confirmation box and the like) shown in the Steam screen right now?
@@ -340,6 +345,7 @@ export function startMusicLowPassContextMonitor(): () => void {
     setContext("quickAccess", open === SIDE_MENU_QUICK_ACCESS);
     checkPopups();
     checkVolume();
+    checkMic();
     // The hold after a game has loaded ends when the music stops (or after a while)
     if (shouldFilter() !== lastFiltered) update();
     // "Normalize Music Volume" may still be waiting for the music chain
@@ -351,24 +357,33 @@ export function startMusicLowPassContextMonitor(): () => void {
   checkMenus();
 
   let micBusy = false;
-  const micTimer = setInterval(() => {
+  const pollMic = () => {
     if (!settings.microphone) {
-      micActive = false;
+      lastMicSignature = undefined;
+      micUntil = 0;
       setContext("microphone", false);
       return;
     }
     if (micBusy) return;
     micBusy = true;
-    readMicActive()
-      .then((active) => {
-        if (active !== undefined) micActive = active;
-        setContext("microphone", micActive);
-      })
+    readMicSignature()
+      .then((signature) => feedMicrophoneState(signature))
       .catch(() => {})
       .finally(() => {
         micBusy = false;
       });
-  }, MIC_POLL_MS);
+  };
+  const micTimer = setInterval(pollMic, MIC_POLL_MS);
+  // Steam also announces some changes: read the devices again right away when it does
+  const micEvents: any[] = [];
+  try {
+    const audio = (SteamClient as any)?.System?.Audio;
+    for (const name of ["RegisterForDeviceVolumeChanged", "RegisterForDeviceAdded", "RegisterForDeviceRemoved"]) {
+      if (typeof audio?.[name] === "function") micEvents.push(audio[name](() => pollMic()));
+    }
+  } catch (error) {
+    python.logEvent(`Low-pass filter: could not watch Steam's audio events: ${error}`);
+  }
 
   const launchIds = new Set<number>();
   const launchTimers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -412,6 +427,7 @@ export function startMusicLowPassContextMonitor(): () => void {
   return () => {
     clearInterval(menuTimer);
     clearInterval(micTimer);
+    micEvents.forEach((e) => e?.unregister?.());
     started?.unregister?.();
     ended?.unregister?.();
     lifetime?.unregister?.();
@@ -425,7 +441,8 @@ export function startMusicLowPassContextMonitor(): () => void {
     popupOpenedAt = 0;
     notificationUntil = 0;
     volumeUntil = 0;
-    micActive = false;
+    micUntil = 0;
+    lastMicSignature = undefined;
     applyFilterTarget();
   };
 }
