@@ -4,6 +4,8 @@ All notable changes to Audio Loader Encore. Newest first.
 
 ## 1.6.5
 
+Everything since 1.6.1 (versions 1.6.2 to 1.6.4 were never released on their own).
+
 ### Fixed
 - **Music looping by itself in the shuffle modes.** Two causes:
   - With **Music by Time of Day** on, every replay picked the time-of-day pack again, so the same
@@ -12,36 +14,26 @@ All notable changes to Audio Loader Encore. Newest first.
     **Skip** follow the same rule.
   - If the music ended and the next one did not start by itself, the "music went silent" repair pressed
     play on the same, ended music again. In a shuffle mode it now starts the next music instead.
-- Tests for the time-of-day rule.
-
-## 1.6.4
+- **Muffled Music: Microphone** was rebuilt. The old version looked for a "muted" flag that Steam does not
+  provide, so it most likely never worked. Now it reads the input side of Steam's audio devices twice a
+  second (and right away when Steam announces a device or volume change). When something there changes
+  (the microphone is switched on or off, muted, its volume or the chosen input changes), the music is
+  muffled for 1.5 seconds, like the Volume toggle. It can never stay on by itself. The Decky log shows
+  what Steam reports ("reading the microphone works (...)"), to help if it still does nothing. The
+  microphone watcher also can no longer get stuck if Steam never answers one reading.
+- Steam Music: a soundtrack with no playable tracks no longer leaves an empty folder of links behind.
+- A wording fix in the Steam Music tab (it still named the old "New Music Every Replay").
 
 ### Changed
 - **Faster pack lists:** opening a pack list (the Sound Pack dropdown, the Pack Manager pages) no longer
   looks through all Steam soundtrack folders every time. It is done at most every 30 seconds; **Scan Again**
   (Steam Music tab) always scans. This matters most when soundtracks are on a slow SD card.
-- The microphone watcher can no longer get stuck if Steam never answers one reading.
-- A wording fix in the Steam Music tab (it still named the old "New Music Every Replay").
-- Tests for the scan timing.
+- **Music by Time of Day** now plays its pack once for each part of the day instead of on every replay.
 
-## 1.6.3
-
-### Changed
-- **Muffled Music: Microphone** was rebuilt. The old version looked for a "muted" flag that Steam does not
-  provide, so it most likely never worked. Now it reads the input side of Steam's audio devices twice a
-  second (and right away when Steam announces a device or volume change). When something there changes
-  (the microphone is switched on or off, muted, its volume or the chosen input changes), the music is
-  muffled for 1.5 seconds, like the Volume toggle. It can never stay on by itself.
-- The first line in the Decky log now shows what Steam reports ("reading the microphone works (...)"),
-  to help if it still does nothing.
-- Tests for the microphone detection.
-
-## 1.6.2
-
-### Changed
-- Steam Music: a soundtrack with no playable tracks no longer leaves an empty folder of links behind.
-- More automatic tests: the muffled-music filter and the Steam Music scan.
-- Project tidy-up: release notes moved to `docs/release-notes`, compiled Python files removed from the repository.
+### Project
+- More automatic tests (the build runs them): the muffled-music filter, the microphone detection, the
+  Steam Music scan and its timing, and the time-of-day rule.
+- Release notes moved to `docs/release-notes`, compiled Python files removed from the repository.
 
 ## 1.6.1
 
