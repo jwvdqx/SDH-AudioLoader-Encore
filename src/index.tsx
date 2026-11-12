@@ -257,6 +257,8 @@ export default definePlugin((serverApi: ServerAPI) => {
       const configLowPassQuickAccess = data?.low_pass_quick_access ?? (oldLowPass && data?.low_pass_steam_menus === true);
       const configLowPassGameLoading = data?.low_pass_game_loading ?? (oldLowPass && data?.low_pass_game_launching === true);
       const configLowPassPopups = data?.low_pass_popups ?? false;
+      const configLowPassVolume = data?.low_pass_volume ?? false;
+      const configLowPassMicrophone = data?.low_pass_microphone ?? false;
       const configLowPassStrength = data?.low_pass_strength ?? 50;
 
       setGlobalState("activeSound", data?.selected_pack || "Default");
@@ -276,12 +278,16 @@ export default definePlugin((serverApi: ServerAPI) => {
       setGlobalState("lowPassQuickAccess", configLowPassQuickAccess);
       setGlobalState("lowPassGameLoading", configLowPassGameLoading);
       setGlobalState("lowPassPopups", configLowPassPopups);
+      setGlobalState("lowPassVolume", configLowPassVolume);
+      setGlobalState("lowPassMicrophone", configLowPassMicrophone);
       setGlobalState("lowPassStrength", configLowPassStrength);
       configureMusicLowPass({
         steamMenu: configLowPassSteamMenu,
         quickAccess: configLowPassQuickAccess,
         gameLoading: configLowPassGameLoading,
         popups: configLowPassPopups,
+        volume: configLowPassVolume,
+        microphone: configLowPassMicrophone,
         strength: configLowPassStrength,
       });
       nowPlayingSettings.enabled = configNowPlaying;

@@ -62,6 +62,8 @@ interface PublicGlobalState {
   lowPassQuickAccess: boolean;
   lowPassGameLoading: boolean;
   lowPassPopups: boolean;
+  lowPassVolume: boolean;
+  lowPassMicrophone: boolean;
   lowPassStrength: number;
   isInstalling: boolean;
 }
@@ -172,6 +174,8 @@ export class GlobalState {
   private lowPassQuickAccess: boolean = false;
   private lowPassGameLoading: boolean = false;
   private lowPassPopups: boolean = false;
+  private lowPassVolume: boolean = false;
+  private lowPassMicrophone: boolean = false;
   private lowPassStrength: number = 50;
   private browserPackList: packDbEntry[] = [];
   private searchFieldValue: string = "";
@@ -219,6 +223,8 @@ export class GlobalState {
       lowPassQuickAccess: this.lowPassQuickAccess,
       lowPassGameLoading: this.lowPassGameLoading,
       lowPassPopups: this.lowPassPopups,
+      lowPassVolume: this.lowPassVolume,
+      lowPassMicrophone: this.lowPassMicrophone,
       lowPassStrength: this.lowPassStrength,
       browserPackList: this.browserPackList,
       searchFieldValue: this.searchFieldValue,

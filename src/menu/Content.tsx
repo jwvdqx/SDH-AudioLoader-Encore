@@ -702,16 +702,35 @@ const SoundsTab: VFC = () => {
 };
 
 const EffectsTab: VFC = () => {
-  const { legacyEnabled, lowPassSteamMenu, lowPassQuickAccess, lowPassGameLoading, lowPassPopups, lowPassStrength, setGlobalState } =
-    useGlobalState();
+  const {
+    legacyEnabled,
+    lowPassSteamMenu,
+    lowPassQuickAccess,
+    lowPassGameLoading,
+    lowPassPopups,
+    lowPassVolume,
+    lowPassMicrophone,
+    lowPassStrength,
+    setGlobalState,
+  } = useGlobalState();
   const apply = (
-    patch: Partial<{ steamMenu: boolean; quickAccess: boolean; gameLoading: boolean; popups: boolean; strength: number }>
+    patch: Partial<{
+      steamMenu: boolean;
+      quickAccess: boolean;
+      gameLoading: boolean;
+      popups: boolean;
+      volume: boolean;
+      microphone: boolean;
+      strength: number;
+    }>
   ) =>
     configureMusicLowPass({
       steamMenu: lowPassSteamMenu,
       quickAccess: lowPassQuickAccess,
       gameLoading: lowPassGameLoading,
       popups: lowPassPopups,
+      volume: lowPassVolume,
+      microphone: lowPassMicrophone,
       strength: lowPassStrength,
       ...patch,
     });
@@ -758,6 +777,26 @@ const EffectsTab: VFC = () => {
             setGlobalState("lowPassPopups", value);
             apply({ popups: value });
             python.setConfig({ low_pass_popups: value });
+          }}
+        />
+        <Toggle
+          label="Volume"
+          description="While you change the volume (volume buttons or slider), and for a moment after."
+          checked={lowPassVolume}
+          onChange={(value) => {
+            setGlobalState("lowPassVolume", value);
+            apply({ volume: value });
+            python.setConfig({ low_pass_volume: value });
+          }}
+        />
+        <Toggle
+          label="Microphone"
+          description="While the microphone is on (not muted). Experimental: check Info > Show Debug Info if it does nothing."
+          checked={lowPassMicrophone}
+          onChange={(value) => {
+            setGlobalState("lowPassMicrophone", value);
+            apply({ microphone: value });
+            python.setConfig({ low_pass_microphone: value });
           }}
         />
         <Slider
@@ -898,7 +937,7 @@ const InfoTab: VFC<{ version: string }> = ({ version }) => {
         normalizeSounds: g.normalizeSounds,
         steamTracks: g.soundPacks.filter((p) => p.steam).length,
         steamInRotation: settings.steam_music_in_rotation,
-        lowPass: [g.lowPassSteamMenu, g.lowPassQuickAccess, g.lowPassGameLoading, g.lowPassPopups, g.lowPassStrength],
+        lowPass: [g.lowPassSteamMenu, g.lowPassQuickAccess, g.lowPassGameLoading, g.lowPassPopups, g.lowPassVolume, g.lowPassMicrophone, g.lowPassStrength],
       },
       extra: { status: limitStatusText() },
     });

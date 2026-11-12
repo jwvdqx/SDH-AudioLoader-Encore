@@ -28,6 +28,9 @@ starter_config_data = {
   "low_pass_steam_menu": False,
   "low_pass_quick_access": False,
   "low_pass_game_loading": False,
+  "low_pass_popups": False,
+  "low_pass_volume": False,
+  "low_pass_microphone": False,
   "low_pass_strength": 50,
   "loudness_cache": {},
   "recent_music": []
@@ -333,6 +336,9 @@ class Plugin:
             "low_pass_steam_menu": False,
             "low_pass_quick_access": False,
             "low_pass_game_loading": False,
+            "low_pass_popups": False,
+            "low_pass_volume": False,
+            "low_pass_microphone": False,
             "low_pass_strength": 50,
             "loudness_cache": {},
             "recent_music": []
