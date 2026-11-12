@@ -2,6 +2,18 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.5
+
+### Fixed
+- **Music looping by itself in the shuffle modes.** Two causes:
+  - With **Music by Time of Day** on, every replay picked the time-of-day pack again, so the same
+    music played over and over for the whole part of the day. Now that pack plays once when the part of
+    the day starts (or when the Deck starts); after that the shuffle goes on. The **Up next** line and
+    **Skip** follow the same rule.
+  - If the music ended and the next one did not start by itself, the "music went silent" repair pressed
+    play on the same, ended music again. In a shuffle mode it now starts the next music instead.
+- Tests for the time-of-day rule.
+
 ## 1.6.4
 
 ### Changed

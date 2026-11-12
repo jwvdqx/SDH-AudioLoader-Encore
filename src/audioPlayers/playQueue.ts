@@ -1,6 +1,6 @@
 import { Pack } from "../classes";
 import { settings } from "../settings";
-import { pickReplayMusic, timeOfDayPack } from "./dailyMusic";
+import { pickReplayMusic, slotForHour, timeOfDayPack } from "./dailyMusic";
 import { rotationMusicNames } from "./steamMusic";
 
 // "Up Next": the music that comes after the current one is chosen ahead of time and remembered,
@@ -48,31 +48,59 @@ function queuedPick(packs: Pack[], current: string): string | null {
   return name;
 }
 
+// "Music by Time of Day" and the music that follows an ending piece: the pack chosen for this part of
+// the day is played once when the part of the day starts (or when the Deck starts). After that the
+// shuffle goes on as normal. Without this rule, every replay would pick the same time-of-day pack
+// again, and that music seemed to loop by itself.
+let todAppliedSlot: string | null = null;
+
+const currentSlot = (): string => slotForHour(new Date().getHours());
+
+/** The time-of-day pack that should play next (it was not played yet in this part of the day), or null. */
+function todForReplay(packs: Pack[], current: string): string | null {
+  const tod = timeOfDayPack(packs);
+  if (!tod || tod === current) return null;
+  return todAppliedSlot === currentSlot() ? null : tod;
+}
+
 /**
  * What plays when the current music ends. null in Repeat mode (the same music plays again).
- * "Music by Time of Day" decides first, like it does for every replay.
+ * "Music by Time of Day" decides first, but only once for each part of the day.
  */
 export function peekAutoNext(packs: Pack[], current: string): string | null {
   if (settings.play_mode === "repeat") return null;
-  return timeOfDayPack(packs) ?? queuedPick(packs, current);
+  return todForReplay(packs, current) ?? queuedPick(packs, current);
 }
 
 /** What the Skip button plays (also in Repeat mode: skipping always goes somewhere else). */
 export function peekSkip(packs: Pack[], current: string): string | null {
-  const tod = settings.play_mode === "repeat" ? null : timeOfDayPack(packs);
-  if (tod && tod !== current) return tod;
-  return queuedPick(packs, current);
+  const tod = settings.play_mode === "repeat" ? null : todForReplay(packs, current);
+  return tod ?? queuedPick(packs, current);
+}
+
+// Called when the time-of-day pack is what plays now (for example right after the Deck started)
+function noteTimeOfDayPlaying(packs: Pack[], current: string): void {
+  if (timeOfDayPack(packs) === current) todAppliedSlot = currentSlot();
 }
 
 /** The chosen next music, used up: the following one is chosen fresh. */
 export function takeQueued(packs: Pack[], current: string): string | null {
+  noteTimeOfDayPlaying(packs, current);
+  const tod = todForReplay(packs, current);
+  if (tod) {
+    todAppliedSlot = currentSlot();
+    queued = null;
+    return tod;
+  }
   const name = queuedPick(packs, current);
   queued = null;
   return name;
 }
 
 export function takeSkip(packs: Pack[], current: string): string | null {
+  noteTimeOfDayPlaying(packs, current);
   const name = peekSkip(packs, current);
+  if (name && name === timeOfDayPack(packs)) todAppliedSlot = currentSlot();
   queued = null;
   return name;
 }

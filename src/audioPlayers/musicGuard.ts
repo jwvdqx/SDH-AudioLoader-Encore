@@ -9,7 +9,7 @@ import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v1.6.4";
+export const BUILD_TAG = "v1.6.5";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -63,10 +63,10 @@ export function playRandomMusic(state: GlobalState): boolean {
   }
   if (!s.replayRandomMusic) return false;
   if (menuMusicControl.pausedByLimit !== null) return false;
-  // "Music by Time of Day" decides the music for this part of the day, when it has a choice
-  const timePick = timeOfDayPack(s.soundPacks);
-  const pick = timePick ?? takeQueued(s.soundPacks, s.selectedMusic);
+  // "Music by Time of Day" decides the music when a part of the day starts; after that it shuffles
+  const pick = takeQueued(s.soundPacks, s.selectedMusic);
   if (!pick) return false;
+  const timePick = timeOfDayPack(s.soundPacks) === pick;
   note(timePick ? `Music for the replay (time of day): ${pick}` : `New music for the replay: ${pick}`);
   // Remember what is playing now, so the next start (for example coming back from Desktop Mode)
   // picks something different from it
@@ -242,6 +242,13 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
     }
     if (musicToPlay === "None") {
       say("Music not restarted: no music is selected.");
+      return;
+    }
+
+    // The music has simply ended (and the next one did not start by itself): in a shuffle mode that
+    // means the next music, not the same one again
+    if (reason === "silent" && s.menuMusic?.ended && s.replayRandomMusic && playRandomMusic(state)) {
+      say("The music had ended: the next music started.");
       return;
     }
 

@@ -173,3 +173,37 @@ test("Up Next: Music by Time of Day decides when it has a choice", () => {
   assert.equal(queue.peekAutoNext(lib, "Halo - Theme"), "Portal - Still Alive");
   loadSettings({});
 });
+
+test("Time of Day plays its pack once for each part of the day, then the shuffle goes on", () => {
+  const lib = names.map((n) => pack(n));
+  const all = {};
+  for (const s of ["tod_morning", "tod_afternoon", "tod_night"]) all[s] = "Portal - Still Alive";
+  loadSettings({ play_mode: "shuffle", tod_enabled: true, ...all });
+
+  // the time-of-day pack is already what plays: the next music is something else
+  for (let i = 0; i < 40; i++) {
+    const next = queue.takeQueued(lib, "Portal - Still Alive");
+    assert.notEqual(next, "Portal - Still Alive", "it must not start the same music again");
+  }
+  // later pieces keep shuffling: the time-of-day pack does not come back every time
+  let portal = 0;
+  let current = "Halo - Theme";
+  for (let i = 0; i < 60; i++) {
+    current = queue.takeQueued(lib, current);
+    if (current === "Portal - Still Alive") portal++;
+  }
+  assert.ok(portal < 30, "the time-of-day pack came back too often: " + portal + " of 60");
+  loadSettings({});
+});
+
+test("Time of Day: the Up Next line never shows the music that is playing now", () => {
+  const lib = names.map((n) => pack(n));
+  const all = {};
+  for (const s of ["tod_morning", "tod_afternoon", "tod_night"]) all[s] = "Doom - E1M1";
+  loadSettings({ play_mode: "smart", tod_enabled: true, ...all });
+  for (let i = 0; i < 40; i++) {
+    assert.notEqual(queue.peekAutoNext(lib, "Doom - E1M1"), "Doom - E1M1");
+    assert.notEqual(queue.peekSkip(lib, "Doom - E1M1"), "Doom - E1M1");
+  }
+  loadSettings({});
+});
