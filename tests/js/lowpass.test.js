@@ -2,6 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const lp = require("../../src/audioPlayers/lowPass.ts");
+const { loadSettings } = require("../../src/settings.ts");
 
 // A clock the tests can move, so one test's sounds do not leak into the next one
 let clock = 1_800_000_000_000;
@@ -123,4 +124,33 @@ test("microphone: a missing reading changes nothing", () => {
   lp.feedMicrophoneState(undefined);
   assert.equal(lp.shouldFilter(), false);
   lp.configureMusicLowPass(base);
+});
+
+// ---- Skip Now Playing Notifications ----
+
+test("skip Now Playing: its own notification sound does not muffle the music, other notifications still do", async () => {
+  loadSettings({ lowpass_skip_now_playing: true });
+  lp.configureMusicLowPass({ ...base, popups: true });
+
+  lp.lowPassNowPlayingToast(); // Encore is about to show its Now Playing notification
+  lp.lowPassForSound("deck_ui_toast.wav"); // Steam plays the notification sound
+  assert.equal(lp.shouldFilter(), false, "Now Playing's own sound is ignored");
+
+  await tick(3000); // the Now Playing moment is over
+  lp.lowPassForSound("deck_ui_toast.wav"); // a real notification (a message, an achievement)
+  assert.equal(lp.shouldFilter(), true, "other notifications still muffle");
+  await tick(4000);
+  assert.equal(lp.shouldFilter(), false);
+  lp.configureMusicLowPass(base);
+});
+
+test("skip Now Playing: switched off, the notification muffles as before", async () => {
+  loadSettings({ lowpass_skip_now_playing: false });
+  lp.configureMusicLowPass({ ...base, popups: true });
+  lp.lowPassNowPlayingToast();
+  lp.lowPassForSound("deck_ui_toast.wav");
+  assert.equal(lp.shouldFilter(), true);
+  await tick(4000);
+  lp.configureMusicLowPass(base);
+  loadSettings({});
 });

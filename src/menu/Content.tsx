@@ -777,6 +777,7 @@ const SoundsTab: VFC = () => {
 };
 
 const EffectsTab: VFC = () => {
+  const settings = useSettings();
   const {
     legacyEnabled,
     lowPassSteamMenu,
@@ -853,6 +854,12 @@ const EffectsTab: VFC = () => {
             apply({ popups: value });
             python.setConfig({ low_pass_popups: value });
           }}
+        />
+        <Toggle
+          label="Skip Now Playing Notifications"
+          description="Encore's own Now Playing notification does not muffle the music. Only has an effect when Pop-ups and Notifications is on."
+          checked={settings.lowpass_skip_now_playing}
+          onChange={(value) => updateSetting("lowpass_skip_now_playing", value)}
         />
         <Toggle
           label="Volume"

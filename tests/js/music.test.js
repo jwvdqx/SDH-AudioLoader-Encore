@@ -61,6 +61,16 @@ test("saved settings: missing or broken values get their defaults", () => {
   assert.equal(settings.sleep_timer_minutes, 1);
 });
 
+test("saved settings: the Now Playing filter switch is off unless saved on", () => {
+  loadSettings({});
+  assert.equal(settings.lowpass_skip_now_playing, false);
+  loadSettings({ lowpass_skip_now_playing: true });
+  assert.equal(settings.lowpass_skip_now_playing, true);
+  loadSettings({ lowpass_skip_now_playing: "yes" });
+  assert.equal(settings.lowpass_skip_now_playing, false);
+  loadSettings({});
+});
+
 test("saved settings: the old 'Pure Random' switch becomes variety 0", () => {
   loadSettings({ pure_random_music: true });
   assert.equal(settings.variety_level, 0);

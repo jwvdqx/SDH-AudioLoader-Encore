@@ -22,6 +22,8 @@ export interface Settings {
   variety_level: number;
   smooth_fades: boolean;
   duck_notifications: boolean;
+  /** The muffled-music filter ignores the sound of Encore's own Now Playing notification. */
+  lowpass_skip_now_playing: boolean;
   soft_new_device: boolean;
   tod_enabled: boolean;
   tod_morning: string;
@@ -48,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   variety_level: 100,
   smooth_fades: false,
   duck_notifications: false,
+  lowpass_skip_now_playing: false,
   soft_new_device: false,
   tod_enabled: false,
   tod_morning: "",
@@ -100,6 +103,7 @@ export function loadSettings(data: any): void {
   );
   settings.smooth_fades = d.smooth_fades === true;
   settings.duck_notifications = d.duck_notifications === true;
+  settings.lowpass_skip_now_playing = d.lowpass_skip_now_playing === true;
   settings.soft_new_device = d.soft_new_device === true;
   settings.tod_enabled = d.tod_enabled === true;
   settings.tod_morning = typeof d.tod_morning === "string" ? d.tod_morning : "";

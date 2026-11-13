@@ -1,5 +1,6 @@
 import { Pack } from "../classes";
 import * as python from "../python";
+import { lowPassNowPlayingToast } from "./lowPass";
 
 // "Show Now Playing Notifications": an Encore-only toast when new music starts.
 // This setting must not gate the Now Playing card or any other Decky/Steam notifications.
@@ -70,5 +71,6 @@ export function announceMusic(pack: Pack | undefined) {
   const steam = pack.steam;
   const { title, durationMs } = titleFor(`Now Playing: ${steam ? steam.title : pack.name}`);
   const credits = steam ? clip(`${steam.artist} - ${steam.album}`) : shortCredits(pack.author);
+  lowPassNowPlayingToast();
   python.toast(title, credits, durationMs);
 }

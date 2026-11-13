@@ -1,5 +1,6 @@
 import { findSP } from "decky-frontend-lib";
 import * as python from "../python";
+import { settings as appSettings } from "../settings";
 import { musicWantsGraph } from "./loudness";
 import {
   allMusicGraphs,
@@ -88,6 +89,10 @@ let lastFiltered = false;
 // Pop-up state
 let popupOpenedAt = 0;
 let notificationUntil = 0;
+// Encore's own Now Playing notification plays Steam's notification sound a moment after it is shown.
+// With "Skip Now Playing Notifications" on, the filter ignores notification sounds until this time.
+const NOW_PLAYING_SOUND_WINDOW_MS = 2500;
+let ignoreNotificationSoundUntil = 0;
 let dialogSeenEver = false;
 let dialogGoneSince = 0;
 // Volume / microphone state
@@ -191,6 +196,11 @@ export function setMusicLowPassPlayer(element: HTMLAudioElement | null): void {
   update();
 }
 
+/** Call right before Encore shows its own Now Playing notification, so its sound can be ignored. */
+export function lowPassNowPlayingToast(): void {
+  ignoreNotificationSoundUntil = Date.now() + NOW_PLAYING_SOUND_WINDOW_MS;
+}
+
 /** Call with the name of every Steam sound effect that is about to play ("deck_ui_toast.wav"). */
 export function lowPassForSound(soundName: string): void {
   if (POPUP_OPEN_SOUNDS.has(soundName)) {
@@ -199,6 +209,8 @@ export function lowPassForSound(soundName: string): void {
   } else if (POPUP_CLOSE_SOUNDS.has(soundName)) {
     popupOpenedAt = 0;
   } else if (NOTIFICATION_SOUNDS.has(soundName)) {
+    // The sound of Encore's own Now Playing notification does not muffle the music (when chosen)
+    if (appSettings.lowpass_skip_now_playing && Date.now() < ignoreNotificationSoundUntil) return;
     notificationUntil = Date.now() + NOTIFICATION_MS;
   } else if (VOLUME_SOUNDS.has(soundName)) {
     volumeUntil = Date.now() + VOLUME_HOLD_MS;

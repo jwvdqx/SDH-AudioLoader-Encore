@@ -2,6 +2,15 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.6
+
+### Added
+- **Skip Now Playing Notifications** (Effects tab, under Pop-ups and Notifications): a separate switch so
+  that Encore's own Now Playing notification does not muffle the music. Other notifications (messages,
+  achievements) still do. It only has an effect when **Pop-ups and Notifications** is on, and it is off by
+  default. The Now Playing sound is recognised for 2.5 seconds after Encore shows its notification.
+- Tests for it.
+
 ## 1.6.5
 
 Everything since 1.6.1 (versions 1.6.2 to 1.6.4 were never released on their own).
