@@ -2,7 +2,7 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
-## 1.10.0
+## 1.9.1
 
 **Find Music: SoundCloud search and adding songs.** (YouTube comes next.)
 
