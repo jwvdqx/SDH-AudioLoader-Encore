@@ -100,6 +100,16 @@ let volumeUntil = 0;
 let micUntil = 0;
 let lastMicSignature: string | undefined;
 
+let lastDialogOnScreen = false;
+// Checks while the music is not playing: 1 in this many (every 2 s instead of 4 times a second)
+const IDLE_EVERY = 8;
+
+function musicIdle(): boolean {
+  // A player that exists but is not playing (no player at all: the checks stay as they were)
+  if (!currentElement) return false;
+  return (currentElement.paused || currentElement.ended) && !activeContexts.has("gameLoading") && !activeContexts.has("preview");
+}
+
 function anyEnabled(): boolean {
   return (
     settings.steamMenu ||
@@ -306,9 +316,10 @@ function dialogOnScreen(): boolean {
   return false;
 }
 
-function checkPopups(): void {
+function checkPopups(lookAtScreen = true): void {
   const now = Date.now();
-  const onScreen = settings.popups ? dialogOnScreen() : false;
+  const onScreen = settings.popups && lookAtScreen ? dialogOnScreen() : lastDialogOnScreen;
+  lastDialogOnScreen = onScreen;
   if (onScreen) {
     dialogSeenEver = true;
     dialogGoneSince = 0;
@@ -343,7 +354,33 @@ export function readOpenSideMenu(): number | undefined {
  */
 export function startMusicLowPassContextMonitor(): () => void {
   let menuLogged = false;
+  let idleTicks = 0;
   const checkMenus = () => {
+    // Nothing to do when no muffled-music toggle is on (Normalize Music Volume may still want the chain)
+    if (!anyEnabled()) {
+      if (activeContexts.size > 0) {
+        activeContexts.clear();
+        applyFilterTarget();
+      }
+      if (currentElement && musicWantsGraph()) void requestMusicGraph(currentElement);
+      return;
+    }
+    // While the music is not playing (a game is running, it is paused) the filter cannot be heard:
+    // the costly readings (Steam's menu state, dialogs on the screen) are made only every 2 seconds.
+    // The timers (volume, notifications, microphone) still end on time. The first check after the
+    // music plays again is right away.
+    if (musicIdle()) {
+      idleTicks++;
+      if (idleTicks % IDLE_EVERY !== 1) {
+        checkPopups(false);
+        checkVolume();
+        checkMic();
+        if (shouldFilter() !== lastFiltered) update();
+        return;
+      }
+    } else {
+      idleTicks = 0;
+    }
     const open = readOpenSideMenu();
     if (!menuLogged) {
       menuLogged = true;
@@ -371,6 +408,12 @@ export function startMusicLowPassContextMonitor(): () => void {
   let micBusy = false;
   let micBusySince = 0;
   const pollMic = () => {
+    // No reading while the music is not playing; the next reading starts fresh, so a change made
+    // during a game does not muffle the music when it comes back
+    if (settings.microphone && musicIdle() && micUntil <= Date.now()) {
+      lastMicSignature = undefined;
+      return;
+    }
     if (!settings.microphone) {
       lastMicSignature = undefined;
       micUntil = 0;

@@ -359,6 +359,22 @@ class DamagedConfig(unittest.TestCase):
         self.assertIn("selected_pack", saved)
 
 
+class PackListVersion(unittest.TestCase):
+    def test_the_list_is_only_sent_when_it_changed(self):
+        P = main.Plugin
+        P.soundPacks = []
+        P.steamPacks = [{"name": "OST - One", "music": True}]
+        first = asyncio.run(P.get_sound_packs_if_changed(P, ""))
+        self.assertEqual(first["packs"], P.steamPacks)
+        again = asyncio.run(P.get_sound_packs_if_changed(P, first["version"]))
+        self.assertIsNone(again["packs"])
+        P.steamPacks = P.steamPacks + [{"name": "OST - Two", "music": True}]
+        changed = asyncio.run(P.get_sound_packs_if_changed(P, first["version"]))
+        self.assertEqual(len(changed["packs"]), 2)
+        self.assertNotEqual(changed["version"], first["version"])
+        P.steamPacks = []
+
+
 class UpdateCheck(unittest.TestCase):
     # Decky calls plugin methods on the class, with the class as "self"
     def test_update_check_works_the_way_decky_calls_it(self):

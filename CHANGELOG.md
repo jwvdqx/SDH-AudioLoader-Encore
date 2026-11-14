@@ -2,6 +2,32 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.7.0
+
+Performance. Includes 1.6.9 (never released on its own).
+
+### Changed
+- **The muffled-music watcher does far less.** It used to read Steam's menu state, look for dialogs on the
+  screen and check the volume and microphone timers 4 times a second, all the time, including during
+  games and with every muffled-music toggle off. Now:
+  - with every muffled-music toggle off, it does not read anything;
+  - while the music is not playing (a game is running, or it is paused), Steam's menu state and the
+    screen are read every 2 seconds instead of 4 times a second, and the microphone is not read at
+    all. The timers still end on time, and the first check after the music plays again is immediate.
+- **Settings are saved in batches.** Changes made close together (dragging a slider, one action changing
+  several settings) are merged and written once, 0.4 seconds later. Before, every slider step rewrote the
+  whole settings file, which is over 100 KB with a large library, and forced it to disk. Waiting changes
+  are written when the plugin is unloaded.
+- **Pack lists open without resending everything.** Opening a pack list asked the backend for every pack
+  again: about 600 KB for 1,000 Steam tracks. The backend now sends the list only when it changed, and an
+  unchanged list no longer re-draws the menus or drops the chosen "Up next".
+
+### Fixed (from 1.6.9)
+- A damaged settings file no longer breaks the plugin: settings are written safely (temporary file, then
+  swapped in), and a damaged file is kept as `config.json.broken` while the plugin starts with defaults.
+- Uninstalling a pack that was already gone gave an error instead of a clear message.
+- When Check for Updates fails inside the plugin, the error now says why.
+
 ## 1.6.9
 
 ### Fixed

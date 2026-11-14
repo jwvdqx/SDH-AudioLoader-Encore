@@ -1,4 +1,4 @@
-import json, tempfile, asyncio
+import json, tempfile, asyncio, hashlib
 import ssl
 import urllib.request
 import shutil
@@ -224,6 +224,16 @@ class Plugin:
     async def get_sound_packs(self) -> list:
         # The installed packs, then the tracks of the Steam soundtracks (see steam_music.py)
         return [x.to_dict() for x in self.soundPacks] + list(getattr(self, "steamPacks", []))
+
+    async def get_sound_packs_if_changed(self, known: str = "") -> dict:
+        # The same list as get_sound_packs, but only sent when it changed since the version the screen
+        # already has ("known"). With hundreds of Steam tracks the list is several hundred KB, and it is
+        # asked for every time a pack list is opened.
+        packs = [x.to_dict() for x in self.soundPacks] + list(getattr(self, "steamPacks", []))
+        version = hashlib.sha1(json.dumps(packs, sort_keys=True).encode("utf-8")).hexdigest()
+        if version == known:
+            return {"version": version, "packs": None}
+        return {"version": version, "packs": packs}
 
     async def download_theme_from_url(self, id : str, url : str) -> dict:
         return (await install(id, url)).to_dict()

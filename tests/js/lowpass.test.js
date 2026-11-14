@@ -154,3 +154,47 @@ test("skip Now Playing: switched off, the notification muffles as before", async
   lp.configureMusicLowPass(base);
   loadSettings({});
 });
+
+// ---- 1.7: the watcher does less while the music is not playing ----
+test("while the music is paused, Steam's menu state is read only every 2 seconds", async () => {
+  let reads = 0;
+  const menu = { GetOpenSideMenu: () => { reads++; return 0; } };
+  global.window = global.window || {};
+  const oldStore = window.SteamUIStore;
+  window.SteamUIStore = { WindowStore: { GamepadUIMainWindowInstance: { MenuStore: menu } } };
+  const player = { paused: false, ended: false, volume: 1 };
+  lp.setMusicLowPassPlayer(player);
+  lp.configureMusicLowPass({ ...base, steamMenu: true });
+  reads = 0;
+  await new Promise((r) => setTimeout(r, 1100));
+  const playing = reads;
+  player.paused = true;
+  reads = 0;
+  await new Promise((r) => setTimeout(r, 2100));
+  const paused = reads;
+  assert.ok(playing >= 3, `reads while playing: ${playing}`);
+  assert.ok(paused <= 2, `reads while paused: ${paused}`);
+  // the filter still ends on time while paused (the volume timer)
+  lp.configureMusicLowPass({ ...base, volume: true });
+  lp.lowPassForSound("deck_ui_volume.wav");
+  assert.equal(lp.shouldFilter(), true);
+  await tick(2000);
+  assert.equal(lp.shouldFilter(), false);
+  lp.configureMusicLowPass(base);
+  lp.setMusicLowPassPlayer(null);
+  window.SteamUIStore = oldStore;
+});
+
+test("with every toggle off, Steam's menu state is not read at all", async () => {
+  let reads = 0;
+  global.window = global.window || {};
+  const oldStore = window.SteamUIStore;
+  window.SteamUIStore = { WindowStore: { GamepadUIMainWindowInstance: { MenuStore: { GetOpenSideMenu: () => { reads++; return 0; } } } } };
+  lp.setMusicLowPassPlayer({ paused: false, ended: false, volume: 1 });
+  lp.configureMusicLowPass(base);
+  reads = 0;
+  await new Promise((r) => setTimeout(r, 800));
+  assert.equal(reads, 0);
+  lp.setMusicLowPassPlayer(null);
+  window.SteamUIStore = oldStore;
+});
