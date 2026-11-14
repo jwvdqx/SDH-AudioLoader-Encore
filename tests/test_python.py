@@ -1,6 +1,6 @@
 """Tests for the Python side: zip validation (pack installer) and saving settings (set_config).
 Run with:  python3 tests/test_python.py"""
-import asyncio, importlib.util, json, os, shutil, ssl, struct, sys, tempfile, types, unittest, zipfile
+import asyncio, importlib.util, io, json, os, shutil, ssl, struct, sys, tempfile, types, unittest, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -328,6 +328,39 @@ class SteamMusicScan(unittest.TestCase):
         steam = tempfile.mkdtemp()
         os.makedirs(os.path.join(steam, "steamapps"))
         self.assertEqual(steam_music.scan(steam, tempfile.mkdtemp()), [])
+
+
+
+class UpdateCheck(unittest.TestCase):
+    # Decky calls plugin methods on the class, with the class as "self"
+    def test_update_check_works_the_way_decky_calls_it(self):
+        def fake_urlopen(req, timeout=None, context=None):
+            class Resp(io.BytesIO):
+                def __enter__(self): return self
+                def __exit__(self, *a): return False
+            return Resp(json.dumps({"tag_name": "v9.9.9", "html_url": "https://example.invalid/r"}).encode())
+        old = main.urllib.request.urlopen
+        main.urllib.request.urlopen = fake_urlopen
+        try:
+            r = asyncio.run(main.Plugin.check_for_update(main.Plugin))
+        finally:
+            main.urllib.request.urlopen = old
+        self.assertEqual(r["error"], "")
+        self.assertEqual(r["latest"], "9.9.9")
+        with open(os.path.join(ROOT, "package.json")) as f:
+            self.assertEqual(r["current"], json.load(f)["version"])
+
+    def test_a_network_problem_comes_back_as_an_error_text(self):
+        def broken(*a, **k):
+            raise OSError("no network")
+        old = main.urllib.request.urlopen
+        main.urllib.request.urlopen = broken
+        try:
+            r = asyncio.run(main.Plugin.check_for_update(main.Plugin))
+        finally:
+            main.urllib.request.urlopen = old
+        self.assertIn("no network", r["error"])
+        self.assertNotEqual(r["current"], "")
 
 
 if __name__ == "__main__":

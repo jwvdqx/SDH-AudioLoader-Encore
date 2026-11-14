@@ -64,6 +64,16 @@ async def create_config(path):
     with open(path, 'w') as fp:
         fp.write(starter_config_string)
 
+def read_plugin_version() -> str:
+    # The version written in package.json next to this file
+    try:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "package.json")
+        with open(path, "r") as fp:
+            return str(json.load(fp).get("version", ""))
+    except Exception as e:
+        Log("Audio Loader - Could not read the plugin version: {}".format(e))
+        return ""
+
 class Result:
     def __init__(self, success : bool, message : str = "Success"):
         self.success = success
@@ -133,18 +143,12 @@ class Plugin:
         return AUDIO_LOADER_VERSION
 
     async def get_plugin_version(self) -> str:
-        # The version written in package.json next to this file
-        try:
-            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "package.json")
-            with open(path, "r") as fp:
-                return str(json.load(fp).get("version", ""))
-        except Exception as e:
-            Log("Audio Loader - Could not read the plugin version: {}".format(e))
-            return ""
+        return read_plugin_version()
 
     async def check_for_update(self) -> dict:
         # Asks GitHub for the newest Encore release. Never raises: problems come back as "error".
-        current = await self.get_plugin_version()
+        # (Decky calls these methods on the class itself, so "self.other_method()" would fail here)
+        current = read_plugin_version()
         url = "https://api.github.com/repos/jwvdqx/SDH-AudioLoader-Encore/releases/latest"
 
         def fetch():

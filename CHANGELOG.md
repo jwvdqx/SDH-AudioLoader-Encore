@@ -2,6 +2,13 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.8
+
+### Fixed
+- **Check for Updates always failed.** The check crashed inside the plugin before it reached GitHub
+  (it called another plugin method in a way Decky does not support), so the Info tab showed an error
+  every time. It now works, and a test calls it exactly the way Decky does.
+
 ## 1.6.7
 
 ### Fixed
