@@ -12,6 +12,13 @@ All notable changes to Audio Loader Encore. Newest first.
   Sounds card switches back to Steam's own sounds. Uninstalling the music or sound pack that is in use now
   also stops it or switches back to the default sounds.
 
+- **Media keys control the music** (Music tab > Playback, on by default): **Next** skips, **Prev** goes back to
+  the music played before (press again to go further back), **Play** pauses or resumes, **Stop** pauses.
+  Steam Input can send these keys from any controller button: in a controller layout, pick a button, then
+  Keyboard > **Numpad** > Play / Stop / Next / Prev. To use them everywhere in Steam, set them in
+  Settings > Controller > **Guide Button Chord Layout** (for example Steam + R4 = Next, Steam + L4 = Play).
+  Keyboards with media keys work too. The keys do nothing while a game is running.
+
 ### Changed
 - The **Uninstall** page is replaced by My Packs.
 - **Library tab** (menu): the Favorites & Blocked dropdowns moved to the cards in My Packs. The tab now shows

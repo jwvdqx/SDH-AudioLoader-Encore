@@ -36,6 +36,7 @@ import {
   stopFx,
   stopMusicLowPassAudio,
   startMusicLowPassContextMonitor,
+  startMediaKeys,
   configureMusicLowPass,
   timeOfDayDue,
   markTimeOfDayPlayed,
@@ -414,6 +415,8 @@ export default definePlugin((serverApi: ServerAPI) => {
   // (see audioPlayers/musicGuard.ts)
   const stopMusicGuard = startMusicGuard(state);
   const stopLowPassContextMonitor = startMusicLowPassContextMonitor();
+  // Play, Stop, Next, Prev keys (also from Steam Input) control the menu music
+  const stopMediaKeys = startMediaKeys(state);
   // Battery Saver, Sleep Timer and "Soft Start for New Audio Device"
   const stopMusicLimits = startMusicLimits(state);
 
@@ -453,6 +456,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       AppStateRegistrar.unregister();
       stopMusicGuard();
       stopLowPassContextMonitor();
+      stopMediaKeys();
       stopMusicLowPassAudio();
       stopMusicLimits();
       stopFx();

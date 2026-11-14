@@ -21,6 +21,11 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 **Music tab** (below Music Volume)
 - **Normalize Music Volume**: makes every music pack about equally loud. Loudness is measured the way the ear hears it (LUFS, the method streaming services use): deep bass counts less, and silence or quiet intros are left out, so they do not make a song look quieter than it is. Quiet music is boosted (up to +20 dB, even past the normal maximum volume) and loud music is turned down (up to -30 dB). A gentle leveler also evens out the loud parts inside a song and keeps boosted music from distorting. Each song is measured the first time it plays (a few seconds; the result is saved).
 
+**Controller buttons for the music (media keys)**
+- With **Media Keys Control the Music** on (Music tab > Playback, on by default), the keys **Next** (skip), **Prev** (the music before), **Play** (pause / resume) and **Stop** (pause) control the menu music.
+- To put them on controller buttons: Steam Settings > Controller > **Guide Button Chord Layout** > Edit (works everywhere in Steam, with Steam held), or any game's controller layout. Pick a button, then **Keyboard > Numpad**: Play, Stop, Next, Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
+- Nothing happens while a game is running (the music is paused then, and the keys belong to the game).
+
 **Steam Music tab**
 - Lists every track of the Steam soundtracks you own and have downloaded (in `steamapps/music`, on the internal drive and on SD cards or other library drives). Download a soundtrack in Steam, then press **Scan Again**. The list is also refreshed each time the plugin starts.
 - Tracks are grouped by soundtrack, with the cover, title, artist and track number. Pick a track to play it as menu music (Enable Legacy Features must be on). It then works with the other music options (Normalize Music Volume, Muffled Music, Now Playing, Smooth Fades...).

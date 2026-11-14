@@ -539,6 +539,12 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
 
           <Group id="music-playback" title="Playback">
             <Toggle
+              label="Media Keys Control the Music"
+              description="Play, Stop, Next and Prev keys pause, skip, or go back to the music before. Bind them to controller buttons in Steam Input: in a controller layout (for example Settings > Controller > Guide Button Chord Layout for Steam + a button), pick a button, then Keyboard > Numpad > Play / Stop / Next / Prev."
+              checked={settings.media_keys}
+              onChange={(value) => updateSetting("media_keys", value)}
+            />
+            <Toggle
               label="Show Now Playing Notifications"
               description="Shows an Encore popup when a new music pack or Steam track starts. Turn this off to suppress only these Now Playing notifications; the Now Playing card and all other Steam/Decky notifications are unaffected."
               checked={showNowPlaying}

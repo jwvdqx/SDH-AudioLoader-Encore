@@ -287,3 +287,26 @@ test("the time-of-day pack plays once per part of the day, also after a restart"
   assert.equal(daily.timeOfDaySlotKey(new Date(2026, 10, 14, 1, 0)), daily.timeOfDaySlotKey(new Date(2026, 10, 13, 22, 0)));
   loadSettings({});
 });
+
+// ---- Media keys ----
+const mk = require("../../src/audioPlayers/mediaKeys.ts");
+
+test("media keys: the key names Steam Input and keyboards send are understood", () => {
+  assert.equal(mk.actionForKey("MediaTrackNext"), "next");
+  assert.equal(mk.actionForKey("MediaTrackPrevious"), "previous");
+  assert.equal(mk.actionForKey("MediaPlayPause"), "playpause");
+  assert.equal(mk.actionForKey("MediaStop"), "stop");
+  assert.equal(mk.actionForKey("a"), null);
+  assert.equal(mk.actionForKey(undefined), null);
+});
+
+test("media keys: Prev goes back through the music played before, step by step", () => {
+  const recent = ["A", "B", "Gone", "C", "D"]; // D plays now, "Gone" was uninstalled
+  const exists = (n) => n !== "Gone";
+  const first = mk.previousMusic(recent, "D", [], exists);
+  assert.equal(first, "C");
+  // the history now ends with C (it plays again); pressing Prev again goes further back
+  const recent2 = ["A", "B", "Gone", "D", "C"];
+  assert.equal(mk.previousMusic(recent2, "C", ["D"], exists), "B");
+  assert.equal(mk.previousMusic(["A"], "A", [], exists), null);
+});
