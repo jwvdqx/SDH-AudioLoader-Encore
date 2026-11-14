@@ -63,13 +63,29 @@ export function execute(promise: Promise<any>) {
   })();
 }
 
+// The version of the pack list the screen has. Opening a pack list asks again; the backend only
+// sends the list when it changed (with hundreds of Steam tracks it is several hundred KB, and setting
+// an unchanged list would re-draw every menu and throw away the chosen "Up next" for nothing).
+let packsVersion = "";
+
 export function getAndSetSoundPacks(): Promise<any> {
   const setGlobalState = globalState!.setGlobalState.bind(globalState);
-  return server!.callPluginMethod<{}, Pack[]>("get_sound_packs", {}).then((data) => {
-    if (data.success) {
-      setGlobalState("soundPacks", data.result);
-    }
-  });
+  return server!
+    .callPluginMethod<{ known: string }, { version: string; packs: Pack[] | null }>("get_sound_packs_if_changed", {
+      known: packsVersion,
+    })
+    .then((data) => {
+      if (data.success && data.result && Array.isArray(data.result.packs)) {
+        packsVersion = data.result.version;
+        setGlobalState("soundPacks", data.result.packs);
+        return;
+      }
+      if (data.success) return; // unchanged
+      // An older backend (or an error): the plain list
+      return server!.callPluginMethod<{}, Pack[]>("get_sound_packs", {}).then((plain) => {
+        if (plain.success) setGlobalState("soundPacks", plain.result);
+      });
+    });
 }
 
 // getSoundPacks just fetches the packs already stored in python memory, you need to call this reload function to re-fetch the folder list
@@ -129,8 +145,33 @@ export function getConfig(): Promise<any> {
   return server!.callPluginMethod("get_config", {});
 }
 
-export function setConfig(configObj: object) {
-  return server!.callPluginMethod("set_config", { configObj: configObj });
+// Saving is batched: changes that come close together (a slider being dragged, several settings
+// changed by one action) are merged and written in one go. With a large library the settings file
+// is over 100 KB, and every save rewrites all of it.
+const SAVE_DELAY_MS = 400;
+let pendingConfig: Record<string, any> | null = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingWaiters: (() => void)[] = [];
+
+/** Writes the waiting changes now (also used when the plugin is unloaded). */
+export function flushConfig(): Promise<void> {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const data = pendingConfig;
+  const waiters = pendingWaiters;
+  pendingConfig = null;
+  pendingWaiters = [];
+  if (!data) return Promise.resolve();
+  return Promise.resolve(server?.callPluginMethod("set_config", { configObj: data }))
+    .catch((e) => console.warn("Audio Loader: could not save the settings", e))
+    .then(() => waiters.forEach((w) => w()));
+}
+
+export function setConfig(configObj: object): Promise<void> {
+  pendingConfig = { ...(pendingConfig || {}), ...configObj };
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => void flushConfig(), SAVE_DELAY_MS);
+  return new Promise((resolve) => pendingWaiters.push(resolve));
 }
 
 export function listPackFiles(packPath: string): Promise<any> {

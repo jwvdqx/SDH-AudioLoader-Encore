@@ -438,6 +438,8 @@ export default definePlugin((serverApi: ServerAPI) => {
     ),
     icon: <RiFolderMusicFill />,
     onDismount: () => {
+      // Changes still waiting to be saved
+      void python.flushConfig();
       const { menuMusic, soundPatchInstance, volumePatchInstance } = state.getPublicState();
       const setGlobalState = state.setGlobalState.bind(state);
       if (menuMusic != null) {

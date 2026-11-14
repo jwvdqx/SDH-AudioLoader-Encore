@@ -331,6 +331,50 @@ class SteamMusicScan(unittest.TestCase):
 
 
 
+class DamagedConfig(unittest.TestCase):
+    def setUp(self):
+        self.path = os.path.join(tempfile.mkdtemp(), "config.json")
+
+    def test_a_damaged_file_gives_the_defaults_and_is_kept(self):
+        with open(self.path, "w") as f:
+            f.write('{"music_volume": 0.3, "selec')
+        data = main.read_config_file(self.path)
+        self.assertEqual(data["music_volume"], main.starter_config_data["music_volume"])
+        self.assertTrue(os.path.isfile(self.path + ".broken"))
+
+    def test_writing_leaves_no_temporary_file_and_reads_back(self):
+        main.write_config_file(self.path, {"a": 1})
+        self.assertEqual(main.read_config_file(self.path), {"a": 1})
+        self.assertFalse(os.path.exists(self.path + ".tmp"))
+
+    def test_saving_after_damage_keeps_all_default_settings(self):
+        with open(self.path, "w") as f:
+            f.write("not json")
+        merged = main.read_config_file(self.path)
+        merged.update({"music_volume": 0.2})
+        main.write_config_file(self.path, merged)
+        with open(self.path) as f:
+            saved = json.load(f)
+        self.assertEqual(saved["music_volume"], 0.2)
+        self.assertIn("selected_pack", saved)
+
+
+class PackListVersion(unittest.TestCase):
+    def test_the_list_is_only_sent_when_it_changed(self):
+        P = main.Plugin
+        P.soundPacks = []
+        P.steamPacks = [{"name": "OST - One", "music": True}]
+        first = asyncio.run(P.get_sound_packs_if_changed(P, ""))
+        self.assertEqual(first["packs"], P.steamPacks)
+        again = asyncio.run(P.get_sound_packs_if_changed(P, first["version"]))
+        self.assertIsNone(again["packs"])
+        P.steamPacks = P.steamPacks + [{"name": "OST - Two", "music": True}]
+        changed = asyncio.run(P.get_sound_packs_if_changed(P, first["version"]))
+        self.assertEqual(len(changed["packs"]), 2)
+        self.assertNotEqual(changed["version"], first["version"])
+        P.steamPacks = []
+
+
 class UpdateCheck(unittest.TestCase):
     # Decky calls plugin methods on the class, with the class as "self"
     def test_update_check_works_the_way_decky_calls_it(self):

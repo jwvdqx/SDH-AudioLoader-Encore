@@ -52,8 +52,8 @@ export const FocusButton: VFC<{
     <DialogButton
       style={{ transition: "all 0.12s ease", ...style, ...highlight }}
       onClick={onClick}
-      onFocus={on}
-      onBlur={off}
+      // onFocus/onBlur (mouse and touch) reach the button but are missing from its type
+      {...({ onFocus: on, onBlur: off } as any)}
       onGamepadFocus={on}
       onGamepadBlur={off}
     >
