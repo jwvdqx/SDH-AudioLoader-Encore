@@ -2,6 +2,32 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.10.0
+
+**Find Music: SoundCloud search and adding songs.** (YouTube comes next.)
+
+### Added
+- **Search SoundCloud** from the Find Music page (after Set Up). 10 results per page, up to 10 pages. Each
+  result shows its picture, title, uploader and length, with badges: **In My Packs** (already added),
+  **Preview only** (SoundCloud Go+ tracks that only give a 30 second preview; they cannot be added) and
+  **Long** (over 15 minutes).
+- **Page numbers** like a search engine. When you move down onto them, the page you most likely want is
+  already selected: the next one while going forward, the previous one after going back (the direction
+  only changes when you pick a page the other way). On the last page, its number turns into a small λ.
+- **Download → preview → OK.** The details are always filled in automatically (pack name without "Official
+  Video", "[HD]", "Lyrics" and the like; the artist from the track, or "Artist - Title", or the uploader;
+  the album and the source link; the track's picture). A window shows the pack card exactly as it will look
+  in My Packs, with **OK** (selected) and **Edit** below it. Edit has a clear button for each field, the
+  cover, **Clear All**, Save and Cancel. Nothing is downloaded before OK.
+- **Downloads run in the background** with a progress bar and Cancel. They pause while a game runs and
+  continue where they stopped afterwards, unless **Keep Downloading While a Game Runs** is on. The audio is
+  kept as SoundCloud sends it (no conversion). When it is done, the pack appears in My Packs with its cover
+  and a SoundCloud badge, and works with everything else (Normalize Music Volume, favorites, media keys).
+- **No duplicates:** each added song remembers its site and track id, so the same track is recognised
+  however its link was written, and two different uploads of a song are not mistaken for one.
+- If a download fails because SoundCloud changed, Encore updates yt-dlp (stable, then nightly, then the
+  version before) and tries once more before giving up.
+
 ## 1.9.0
 
 First part of **Find Music** (search SoundCloud and YouTube, add a song as a music pack). This version

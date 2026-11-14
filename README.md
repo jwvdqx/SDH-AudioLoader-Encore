@@ -26,10 +26,12 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 - To put them on controller buttons: Steam Settings > Controller > **Guide Button Chord Layout** > Edit (works everywhere in Steam, with Steam held), or any game's controller layout. Pick a button, then **Keyboard > Numpad**: Play, Stop, Next, Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
 - Nothing happens while a game is running (the music is paused then, and the keys belong to the game).
 
-**Find Music** (Pack Manager, in progress)
+**Find Music** (Pack Manager)
 - Off and greyed out until you press **Set Up Find Music**. Set up downloads **yt-dlp** (about 40 MB), a free open-source downloader, only from its official GitHub releases, with its checksum checked. It updates itself (once a day, and right away when a download fails), keeps the previous version for **Undo**, and can be **Removed**.
 - When YouTube or SoundCloud changes and no yt-dlp version works, a warning explains that Encore depends on yt-dlp and is waiting for its fix. Installed packs are never affected.
-- Search and adding songs arrive in the next version.
+- **Search SoundCloud** (YouTube comes next): 10 results per page, with badges for songs already added, preview-only (Go+) tracks and very long ones. Moving down onto the page numbers selects the page you most likely want next (forward or back, following your direction); the last page hides a small λ.
+- **Download** fills in the details automatically and shows the pack card as it will look in My Packs, with **OK** and **Edit** (clear buttons for each field, Clear All). Nothing downloads before OK.
+- Downloads run in the background with a progress bar, pause during games (unless **Keep Downloading While a Game Runs** is on) and continue afterwards. The same song is never added twice (Encore remembers each song's site and track id).
 
 **Storage** (Pack Manager > Settings)
 - How much space each part of Encore uses, on a bar for the whole drive and one for Encore alone. **Clean Up** deletes only files that are safe to delete, and asks first.

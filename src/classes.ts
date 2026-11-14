@@ -28,6 +28,8 @@ export interface Pack {
   music: boolean;
   hasIntro: boolean;
   id: string;
+  /** Packs made by Find Music: where the song came from */
+  source?: { site: string; id: string; url: string; cover?: string } | null;
   /** Only for the tracks of Steam soundtracks (Steam Music) */
   steam?: SteamTrackInfo;
 }

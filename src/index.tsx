@@ -55,7 +55,7 @@ import {
 } from "./pack-manager";
 import { Content } from "./menu/Content";
 import * as python from "./python";
-import { loadSettings, resolvePlayMode } from "./settings";
+import { loadSettings, resolvePlayMode, settings } from "./settings";
 import { GlobalState, GlobalStateContextProvider, useGlobalState } from "./state/GlobalState";
 
 const PackManagerRouter: VFC = () => {
@@ -389,6 +389,16 @@ export default definePlugin((serverApi: ServerAPI) => {
       const { menuMusic, selectedMusic, gamesRunning } = state.getPublicState();
       const setGlobalState = state.setGlobalState.bind(state);
       menuMusicControl.lastGameEventAt = Date.now();
+      // Find Music downloads pause while a game runs (unless allowed), and continue afterwards
+      try {
+        if (update.bRunning) {
+          if (!settings.download_during_games) python.findMusicControl("pause");
+        } else if (gamesRunning.filter((e) => e !== update.unAppID).length === 0) {
+          python.findMusicControl("resume");
+        }
+      } catch {
+        // never let this get in the way of the music
+      }
       if (selectedMusic !== "None") {
         if (update.bRunning) {
           // Because gamesRunning is in globalState, array methods like push and splice don't work

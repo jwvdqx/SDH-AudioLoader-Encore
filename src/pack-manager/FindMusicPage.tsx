@@ -1,6 +1,9 @@
-import { ConfirmModal, DialogButton, Focusable, showModal, TextField, ToggleField } from "decky-frontend-lib";
-import { useEffect, useState, VFC } from "react";
-import { FaDownload, FaExclamationTriangle, FaSearch } from "react-icons/fa";
+import { ConfirmModal, DialogButton, Focusable, ModalRoot, showModal, TextField, ToggleField } from "decky-frontend-lib";
+import { CSSProperties, useEffect, useRef, useState, VFC } from "react";
+import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaSearch, FaTimes } from "react-icons/fa";
+import { Pack } from "../classes";
+import { PackCard } from "./MyPacksPage";
+import { Direction, directionAfter, pagesToShow, preselected, showsEasterEgg } from "./pager";
 import { useSettings } from "../menu/useSettings";
 import * as python from "../python";
 import { updateSetting } from "../settings";
@@ -8,8 +11,8 @@ import { formatBytes } from "./StoragePanel";
 
 // Find Music: search YouTube or SoundCloud and add a song as a music pack.
 // Off and greyed out until the user presses Set up: only then are the downloader tools fetched
-// (see downloader_tools.py). Search and download come in the next step; this page already shows the
-// setup, the tools and the warning for when yt-dlp is broken.
+// (see downloader_tools.py). Then: search (10 results a page), Download, a preview of the pack card
+// (OK / Edit), and the download in the background (it pauses during games unless allowed).
 
 const ACCENT = "#c9a0ff";
 const SITE_NAMES: Record<string, string> = { youtube: "YouTube", soundcloud: "SoundCloud" };
@@ -204,6 +207,470 @@ const SetupCard: VFC<{ onDone: (s: python.ToolsStatus) => void }> = ({ onDone })
   );
 };
 
+// ---- the result cards
+
+const chip = (bg: string): CSSProperties => ({
+  fontSize: "10px",
+  fontWeight: 700,
+  letterSpacing: "0.4px",
+  textTransform: "uppercase",
+  padding: "2px 6px",
+  borderRadius: "4px",
+  background: bg,
+  color: "#fff",
+  whiteSpace: "nowrap",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+});
+
+export const formatDuration = (s: number) => {
+  if (!(s > 0)) return "";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+};
+
+const ResultCard: VFC<{ track: python.FoundTrack; onDownload: () => void }> = ({ track, onDownload }) => {
+  const blocked = !!track.installed || track.preview_only;
+  return (
+    <div
+      style={{
+        width: "212px",
+        borderRadius: "10px",
+        overflow: "hidden",
+        background: "linear-gradient(160deg, rgba(58, 30, 88, 0.75), rgba(20, 20, 44, 0.85))",
+        border: "1px solid rgba(190, 140, 255, 0.2)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          height: "112px",
+          position: "relative",
+          backgroundColor: "#21323d",
+          backgroundImage: track.thumbnail ? `url("${track.thumbnail}")` : "linear-gradient(135deg, #5a3a8a, #1e1e3a)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div style={{ position: "absolute", top: "6px", left: "6px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+          {track.installed && (
+            <span style={chip("rgba(40, 150, 90, 0.95)")}>
+              <FaCheck /> In My Packs
+            </span>
+          )}
+          {track.preview_only && (
+            <span style={chip("rgba(150, 60, 60, 0.95)")}>
+              <FaLock /> Preview only
+            </span>
+          )}
+        </div>
+        <div style={{ position: "absolute", bottom: "6px", right: "6px", display: "flex", gap: "4px" }}>
+          {track.long && (
+            <span style={chip("rgba(200, 120, 30, 0.95)")}>
+              <FaClock /> Long
+            </span>
+          )}
+          {track.duration > 0 && <span style={chip("rgba(0, 0, 0, 0.7)")}>{formatDuration(track.duration)}</span>}
+        </div>
+      </div>
+      <div style={{ padding: "8px 10px 4px", minWidth: 0, flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: "13px", lineHeight: 1.3, maxHeight: "34px", overflow: "hidden" }}>{track.title}</div>
+        <div style={{ fontSize: "11px", opacity: 0.7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {track.uploader}
+        </div>
+      </div>
+      <Focusable style={{ padding: "4px 8px 8px" }}>
+        <DialogButton style={{ minWidth: 0, padding: "6px", fontSize: "13px" }} disabled={blocked} onClick={onDownload}>
+          {track.installed ? "Already added" : track.preview_only ? "Preview only (Go+)" : (
+            <>
+              <FaDownload style={{ marginRight: "6px" }} />
+              Download
+            </>
+          )}
+        </DialogButton>
+      </Focusable>
+    </div>
+  );
+};
+
+// ---- the confirmation window: the pack card as it will look, OK / Edit, and the editor
+
+// Our own lambda in an orange ring, for the last page number (not Valve's logo)
+const Lambda: VFC = () => (
+  <svg width="20" height="20" viewBox="0 0 40 40" aria-label="the end">
+    <circle cx="20" cy="20" r="17" fill="none" stroke="#ff9d1a" strokeWidth="3.5" />
+    <path d="M12 31 L19.5 17 L16.5 10.5 H21 L29 31 H25 L19.8 19.5 L15.8 31 Z" fill="#ff9d1a" />
+  </svg>
+);
+
+const FIELDS: { key: keyof python.TrackDetails; label: string }[] = [
+  { key: "name", label: "Pack name" },
+  { key: "artist", label: "Artist" },
+  { key: "description", label: "Description" },
+];
+
+const AddWindow: VFC<{
+  track: python.FoundTrack;
+  closeModal?: () => void;
+  onStarted: () => void;
+}> = ({ track, closeModal, onStarted }) => {
+  const [details, setDetails] = useState<python.TrackDetails>({ ...track.fill });
+  const [draft, setDraft] = useState<python.TrackDetails>({ ...track.fill });
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const asPack = (d: python.TrackDetails): Pack =>
+    ({
+      name: d.name || "Untitled",
+      author: d.artist || "Unknown",
+      description: d.description,
+      version: "v1.0",
+      music: true,
+      ignore: [],
+      mappings: {},
+      packPath: "",
+      truncatedPackPath: "",
+      hasIntro: false,
+      id: `${track.site}:${track.id}`,
+      source: { site: track.site, id: track.id, url: track.url },
+    } as Pack);
+
+  const ok = async () => {
+    setBusy(true);
+    setError("");
+    const r = await python.findMusicDownload(track, details);
+    setBusy(false);
+    if (!r.ok) {
+      setError(r.error || "Could not start the download.");
+      return;
+    }
+    onStarted();
+    closeModal?.();
+  };
+
+  const field = (key: keyof python.TrackDetails, label: string) => (
+    // @ts-ignore
+    <Focusable key={key} flow-children="row" style={{ display: "flex", gap: "8px", alignItems: "flex-end", marginBottom: "8px" }}>
+      <div style={{ flex: 1 }}>
+        <TextField label={label} value={draft[key]} onChange={(e: any) => setDraft({ ...draft, [key]: e.target.value })} />
+      </div>
+      <DialogButton
+        aria-label={`Clear ${label}`}
+        style={{ width: "40px", minWidth: "40px", padding: 0, height: "32px" }}
+        onClick={() => setDraft({ ...draft, [key]: "" })}
+      >
+        <FaTimes />
+      </DialogButton>
+    </Focusable>
+  );
+
+  return (
+    <ModalRoot closeModal={closeModal} onCancel={editing ? () => setEditing(false) : closeModal} bAllowFullSize>
+      {!editing ? (
+        <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "1.3em", fontWeight: 700, marginBottom: "4px" }}>Add to My Packs?</div>
+            <div style={{ fontSize: "12px", opacity: 0.75, marginBottom: "14px" }}>This is how it will look in your library.</div>
+            <Focusable style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "220px" }}>
+              <DialogButton disabled={busy} onClick={ok}>
+                {busy ? "Starting..." : "OK"}
+              </DialogButton>
+              <DialogButton disabled={busy} onClick={() => { setDraft({ ...details }); setEditing(true); }}>
+                Edit
+              </DialogButton>
+            </Focusable>
+            {error !== "" && <div style={{ color: "#ff9b9b", fontSize: "12px", marginTop: "10px" }}>{error}</div>}
+          </div>
+          <PackCard
+            pack={asPack(details)}
+            coverUrl={details.cover}
+            previewOnly
+            apiUrl=""
+            playing={false}
+            inUse={false}
+            favorite={false}
+            blocked={false}
+            plays={0}
+            onPlayOrUse={() => {}}
+            onFavorite={() => {}}
+            onBlock={() => {}}
+            onUpdate={() => {}}
+            onUninstall={() => {}}
+            onInfo={() => {}}
+          />
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: "1.3em", fontWeight: 700, marginBottom: "10px" }}>Edit Pack Details</div>
+          {FIELDS.map((f) => field(f.key, f.label))}
+          {/* @ts-ignore */}
+          <Focusable flow-children="row" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "6px",
+                background: draft.cover ? `url("${draft.cover}") center / cover` : "linear-gradient(135deg, #5a3a8a, #1e1e3a)",
+              }}
+            />
+            <div style={{ flex: 1, fontSize: "12px", opacity: 0.8 }}>
+              {draft.cover ? "Cover: the track's picture" : "No cover (a music icon is shown)"}
+            </div>
+            {draft.cover ? (
+              <DialogButton style={{ width: "40px", minWidth: "40px", padding: 0, height: "32px" }} onClick={() => setDraft({ ...draft, cover: "" })}>
+                <FaTimes />
+              </DialogButton>
+            ) : track.fill.cover ? (
+              <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ ...draft, cover: track.fill.cover })}>
+                Use Picture
+              </DialogButton>
+            ) : null}
+          </Focusable>
+          {/* @ts-ignore */}
+          <Focusable flow-children="row" style={{ display: "flex", gap: "8px" }}>
+            <DialogButton
+              style={{ width: "auto", minWidth: "120px" }}
+              disabled={draft.name.trim() === ""}
+              onClick={() => {
+                setDetails({ ...draft, name: draft.name.trim() });
+                setEditing(false);
+              }}
+            >
+              Save
+            </DialogButton>
+            <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ name: "", artist: "", description: "", cover: "" })}>
+              Clear All
+            </DialogButton>
+            <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setEditing(false)}>
+              Cancel
+            </DialogButton>
+          </Focusable>
+          {draft.name.trim() === "" && <div style={{ fontSize: "12px", opacity: 0.7, marginTop: "8px" }}>A pack name is needed to save.</div>}
+        </div>
+      )}
+    </ModalRoot>
+  );
+};
+
+// ---- the download in progress
+
+const JobBar: VFC<{ job: python.DownloadJob; onCancel: () => void }> = ({ job, onCancel }) => {
+  const label =
+    job.state === "paused"
+      ? "Paused while a game runs, continues afterwards"
+      : job.state === "failed"
+        ? `Failed: ${job.error}`
+        : job.state === "done"
+          ? "Added to My Packs"
+          : `Downloading ${Math.round(job.progress)}%`;
+  const active = job.state === "downloading" || job.state === "starting" || job.state === "paused";
+  return (
+    // @ts-ignore
+    <Focusable flow-children="row" style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "12px" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: "12px", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <b>{job.name}</b> · <span style={{ color: job.state === "failed" ? "#ff9b9b" : ACCENT }}>{label}</span>
+        </div>
+        <div style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+          <div
+            style={{
+              width: `${job.state === "done" ? 100 : Math.max(2, job.progress)}%`,
+              height: "100%",
+              background: job.state === "failed" ? "#ff7b7b" : job.state === "paused" ? "#c98a4f" : ACCENT,
+              transition: "width 0.4s",
+            }}
+          />
+        </div>
+      </div>
+      {active && (
+        <DialogButton style={{ width: "auto", minWidth: "100px" }} onClick={onCancel}>
+          Cancel
+        </DialogButton>
+      )}
+    </Focusable>
+  );
+};
+
+// ---- the page
+
+const SITES = [
+  { id: "soundcloud", label: "SoundCloud", ready: true },
+  { id: "youtube", label: "YouTube (next update)", ready: false },
+];
+
+const SearchArea: VFC = () => {
+  const [site, setSite] = useState("soundcloud");
+  const [query, setQuery] = useState("");
+  const [searched, setSearched] = useState("");
+  const [page, setPage] = useState(1);
+  const [results, setResults] = useState<python.FoundTrack[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [highestSeen, setHighestSeen] = useState(1);
+  const [lastPage, setLastPage] = useState<number | null>(null);
+  const [direction, setDirection] = useState<Direction>("forward");
+  const [focused, setFocused] = useState<number | null>(null);
+  const [job, setJob] = useState<python.DownloadJob | null>(null);
+  const requestId = useRef(0);
+
+  const load = async (q: string, p: number) => {
+    const id = ++requestId.current;
+    setLoading(true);
+    setError("");
+    const r = await python.findMusicSearch(site, q, p);
+    if (id !== requestId.current) return; // a newer search started meanwhile
+    setLoading(false);
+    setResults(r.results);
+    setPage(r.page);
+    setHighestSeen((h) => Math.max(h, r.page));
+    if (r.last_page) setLastPage(r.page);
+    if (r.error === "broken") setError("");
+    else if (r.error) setError(r.error);
+  };
+
+  const newSearch = () => {
+    const q = query.trim();
+    if (q === "") return;
+    setSearched(q);
+    setHighestSeen(1);
+    setLastPage(null);
+    setDirection("forward");
+    load(q, 1);
+  };
+
+  const goTo = (p: number) => {
+    setDirection(directionAfter(page, p, direction));
+    load(searched, p);
+  };
+
+  // The download: asked for every half second while one is running
+  useEffect(() => {
+    let stop = false;
+    let timer: any = null;
+    const tick = async () => {
+      const j = await python.findMusicJob();
+      if (stop) return;
+      setJob(j);
+      if (j && j.state === "done") {
+        python.toast("Added to My Packs", j.name, 5000);
+        await python.findMusicControl("clear");
+        python.reloadBackend();
+        if (searched) load(searched, page); // marks the track as added
+      }
+      timer = setTimeout(tick, j && ["starting", "downloading", "paused"].includes(j.state) ? 500 : 3000);
+    };
+    tick();
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [searched, page]);
+
+  const shown = pagesToShow(page, highestSeen, lastPage);
+  const target = preselected(page, shown, direction);
+
+  return (
+    <div>
+      {job && <JobBar job={job} onCancel={() => python.findMusicControl("cancel").then(setJob)} />}
+      {/* @ts-ignore */}
+      <Focusable flow-children="row" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
+        {SITES.map((s) => (
+          <DialogButton
+            key={s.id}
+            disabled={!s.ready}
+            onClick={() => setSite(s.id)}
+            style={{
+              width: "auto",
+              minWidth: 0,
+              padding: "6px 14px",
+              background: site === s.id ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : undefined,
+              color: site === s.id ? "#fff" : undefined,
+            }}
+          >
+            {s.label}
+          </DialogButton>
+        ))}
+        <div style={{ flex: 1 }}>
+          <TextField
+            placeholder="Search songs or artists"
+            value={query}
+            onChange={(e: any) => setQuery(e.target.value)}
+            {...({ onKeyDown: (e: any) => e.key === "Enter" && newSearch() } as any)}
+          />
+        </div>
+        <DialogButton style={{ width: "auto", minWidth: "110px" }} disabled={loading || query.trim() === ""} onClick={newSearch}>
+          <FaSearch style={{ marginRight: "6px" }} />
+          Search
+        </DialogButton>
+      </Focusable>
+
+      {loading && <div style={{ opacity: 0.75, margin: "12px 0" }}>Searching...</div>}
+      {!loading && error !== "" && <div style={{ color: "#ff9b9b", margin: "12px 0", fontSize: "13px" }}>Search failed: {error}</div>}
+      {!loading && searched !== "" && results.length === 0 && error === "" && <div style={{ opacity: 0.75, margin: "12px 0" }}>Nothing found.</div>}
+
+      {!loading && results.length > 0 && (
+        <>
+          <Focusable style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+            {results.map((t) => (
+              <ResultCard
+                key={`${t.site}:${t.id}`}
+                track={t}
+                onDownload={() => showModal(<AddWindow track={t} onStarted={() => python.findMusicJob().then(setJob)} />)}
+              />
+            ))}
+          </Focusable>
+          {/* The page numbers. Entering them selects the page most likely wanted next. */}
+          <Focusable
+            // @ts-ignore
+            flow-children="row"
+            {...({ navEntryPreferPosition: 4 } as any)}
+            style={{ display: "flex", gap: "6px", justifyContent: "center", margin: "18px 0 6px" }}
+          >
+            {Array.from({ length: shown }, (_, i) => i + 1).map((n) => {
+              const egg = showsEasterEgg(n, page, shown, lastPage, direction) && focused === n;
+              return (
+                <DialogButton
+                  key={n}
+                  {...({ preferredFocus: n === target, autoFocus: false } as any)}
+                  onGamepadFocus={() => setFocused(n)}
+                  onGamepadBlur={() => setFocused((f) => (f === n ? null : f))}
+                  onClick={() => n !== page && goTo(n)}
+                  style={{
+                    width: "40px",
+                    minWidth: "40px",
+                    height: "40px",
+                    padding: 0,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: n === page ? 800 : 500,
+                    color: n === page ? "#fff" : undefined,
+                    background: n === page ? "linear-gradient(145deg, rgba(120, 70, 190, 0.95), rgba(60, 40, 110, 0.95))" : undefined,
+                    boxShadow: egg ? "0 0 12px rgba(255, 157, 26, 0.8)" : undefined,
+                  }}
+                >
+                  {egg ? <Lambda /> : n}
+                </DialogButton>
+              );
+            })}
+          </Focusable>
+          <div style={{ textAlign: "center", fontSize: "11px", opacity: 0.6 }}>
+            Page {page}
+            {lastPage !== null ? ` of ${lastPage}` : ""}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const FindMusicPage: VFC = () => {
   const [status, setStatus] = useState<python.ToolsStatus | null>(null);
   useEffect(() => {
@@ -218,29 +685,31 @@ export const FindMusicPage: VFC = () => {
       {Object.entries(status.broken || {}).map(([site, info]) => (
         <BrokenWarning key={site} site={site} info={info} />
       ))}
-      {/* The search, greyed out until Find Music is set up */}
-      <div style={{ opacity: ready ? 1 : 0.35, pointerEvents: ready ? "auto" : "none", marginBottom: "14px" }}>
-        <Focusable style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled={!ready}>
-            SoundCloud
-          </DialogButton>
-          <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled={!ready}>
-            YouTube
-          </DialogButton>
-          <div style={{ flex: 1 }}>
-            <TextField disabled placeholder="Search songs" value="" />
+      {ready ? (
+        <>
+          <SearchArea />
+          <div style={{ height: "24px" }} />
+          <DownloaderPanel status={status} onStatus={setStatus} />
+        </>
+      ) : (
+        <>
+          {/* The search, greyed out until Find Music is set up */}
+          <div style={{ opacity: 0.35, pointerEvents: "none", marginBottom: "14px" }}>
+            <Focusable style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
+                SoundCloud
+              </DialogButton>
+              <div style={{ flex: 1 }}>
+                <TextField disabled placeholder="Search songs or artists" value="" />
+              </div>
+              <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
+                <FaSearch />
+              </DialogButton>
+            </Focusable>
           </div>
-          <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled={!ready}>
-            <FaSearch />
-          </DialogButton>
-        </Focusable>
-        {ready && (
-          <div style={{ fontSize: "12px", opacity: 0.75, marginTop: "8px" }}>
-            Search and adding songs arrive in the next update. The downloader is ready.
-          </div>
-        )}
-      </div>
-      {ready ? <DownloaderPanel status={status} onStatus={setStatus} /> : <SetupCard onDone={setStatus} />}
+          <SetupCard onDone={setStatus} />
+        </>
+      )}
     </div>
   );
 };
