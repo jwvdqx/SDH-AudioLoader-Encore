@@ -197,6 +197,13 @@ class ToolsTests(unittest.TestCase):
         self.assertEqual(tools.setup(), "updated")
         self.assertEqual(tools.info("yt-dlp")["tag"], "2026.11.01")
 
+    def test_a_bot_check_block_clears_when_youtube_works_again(self):
+        self.tools.setup()
+        self.tools.mark_blocked("youtube", "Sign in to confirm you're not a bot")
+        self.assertIn("youtube", self.tools.status()["blocked"])
+        self.tools.mark_ok("yt-dlp", "youtube")
+        self.assertEqual(self.tools.status()["blocked"], {})
+
     def test_remove_deletes_everything_and_switches_off(self):
         self.tools.setup()
         self.assertGreater(self.tools.remove(), 0)

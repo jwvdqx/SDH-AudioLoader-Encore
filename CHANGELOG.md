@@ -2,6 +2,29 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.9.2
+
+**Find Music: YouTube.**
+
+### Added
+- **Search YouTube** next to SoundCloud, with the same cards, page numbers, preview (OK / Edit) and
+  background downloads. YouTube search uses YouTube's quick result list, so it is fast.
+- **Deno is set up the first time you download from YouTube** (about 90 MB, from its official GitHub
+  releases, checksum checked, updated the same way as yt-dlp, removable with Remove). YouTube's pages need a
+  JavaScript runtime; yt-dlp's official program already contains YouTube's challenge scripts. SoundCloud
+  never needs Deno.
+- **YouTube clients:** yt-dlp can talk to YouTube as different YouTube apps. When one fails, Encore tries
+  the others, and remembers the one that worked.
+- **Bot checks:** when YouTube asks to "confirm you're not a bot", Encore shows a separate warning that
+  explains it is a temporary block of the network (not a broken yt-dlp, no update fixes it), suggests
+  trying later or using SoundCloud, and clears it once YouTube works again. Encore never signs in to your
+  account.
+- **Duplicates:** every kind of YouTube link (watch?v=, youtu.be, Shorts, YouTube Music, embed, with
+  &t= or playlist parts) comes down to the same video id.
+
+### Changed
+- The Set Up text now gives Deno's real size (about 90 MB unpacked).
+
 ## 1.9.1
 
 **Find Music: SoundCloud search and adding songs.** (YouTube comes next.)
