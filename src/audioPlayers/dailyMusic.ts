@@ -68,7 +68,8 @@ export function pickTodaysMusic(
 
 // ---- Variety: avoid hearing the same music (or the same series) again and again ----
 
-const HISTORY_SIZE = 30;
+// Long enough to remember a whole large library (Steam soundtracks can be hundreds of tracks)
+const HISTORY_SIZE = 600;
 // Packs played lately, oldest first. Saved in the config file as "recent_music".
 export let recentMusic: string[] = [];
 
@@ -119,16 +120,22 @@ function weightedPick<T>(items: T[], weight: (item: T) => number, rnd: () => num
 }
 
 const FAVORITE_WEIGHT = 3;
+// Variety 100: this share of the library must play before a pack can come back
+const AVOID_SHARE = 0.75;
+// Shuffle: random, but nothing from the last half of the library
+const SHUFFLE_AVOID_SHARE = 0.5;
 
 // Picks a pack that was not played lately.
 // - "blocked" packs are never picked (unless every pack is blocked).
 // - "favorites" come up more often (3 times as likely).
-// - "variety" decides how strict the rules are. At 100: no pack from the last 12 plays, and no
-//   series from the last 3 plays, when that is possible. Lower numbers relax this step by step.
+// - "variety" decides how strict the rules are. At 100: nothing from the last 75 % of the library
+//   (so with 200 tracks, at least 150 others play before one comes back), and no series from the last
+//   3 plays, when that is possible. Lower numbers relax this step by step.
 //   At 0 the pick is completely random (only the pack playing right now is skipped).
 // When the strict rules leave nothing, they are relaxed step by step.
-// The series is chosen first (all series equal), then a pack inside it, so a big series with
-// 30 packs does not take over.
+// The series is chosen first, then a pack inside it. A series counts by the square root of its size:
+// a soundtrack with 40 tracks comes up more often than one with 2 (all equal made every track of a
+// small album repeat very often), but less than 20 times as often, so it does not take over.
 export function chooseVaried(
   names: string[],
   current: string,
@@ -149,7 +156,7 @@ export function chooseVaried(
   }
 
   const n = base.length;
-  const avoidCount = Math.floor((Math.min(12, Math.floor(n / 2)) * variety) / 100);
+  const avoidCount = Math.floor((Math.floor(n * AVOID_SHARE) * variety) / 100);
   const seriesCount = Math.round((3 * variety) / 100);
   const avoidPacks = new Set([...(avoidCount > 0 ? recent.slice(-avoidCount) : []), current]);
   const avoidSeries = new Set(
@@ -170,12 +177,24 @@ export function chooseVaried(
     bySeries.set(k, [...(bySeries.get(k) || []), x]);
   }
   const groups = Array.from(bySeries.values());
-  const group = weightedPick(groups, (g) => (g.some((x) => favorites.has(x)) ? 2 : 1), rnd);
+  const group = weightedPick(groups, (g) => Math.sqrt(g.length) * (g.some((x) => favorites.has(x)) ? 2 : 1), rnd);
   return weightedPick(group, packWeight, rnd);
 }
 
+/** Shuffle: random (no series rules, no favorites), but nothing from the last half of the library. */
+export function shufflePick(names: string[], current: string, recent: string[], rnd: () => number = Math.random): string {
+  const allowed = names.filter((x) => !settings.blocked_music.includes(x));
+  const base = allowed.length > 0 ? allowed : names;
+  const avoidCount = Math.floor(base.length * SHUFFLE_AVOID_SHARE);
+  const avoid = new Set([...(avoidCount > 0 ? recent.slice(-avoidCount) : []), current]);
+  const fresh = base.filter((x) => !avoid.has(x));
+  const others = base.filter((x) => x !== current);
+  const pool = fresh.length > 0 ? fresh : others.length > 0 ? others : base;
+  return pool[Math.min(pool.length - 1, Math.floor(rnd() * pool.length))];
+}
+
 // Picks the next music pack. Returns null if no music packs are installed.
-// - Shuffle: purely random (blocked packs are still never picked).
+// - Shuffle: random, but nothing from the last half of the library (blocked packs are never picked).
 // - Smart Shuffle (and Repeat, when the Skip button is pressed): avoids packs and series played
 //   lately (Variety) and plays favorites more often.
 export function pickReplayMusic(
@@ -186,11 +205,7 @@ export function pickReplayMusic(
   const names = rotationMusicNames(soundPacks);
   if (names.length === 0) return null;
   if (mode === "shuffle") {
-    return chooseVaried(names, current, [], Math.random, {
-      variety: 0,
-      favorites: [],
-      blocked: settings.blocked_music,
-    });
+    return shufflePick(names, current, recentMusic);
   }
   return chooseVaried(names, current, recentMusic);
 }
@@ -214,4 +229,31 @@ export function timeOfDayPack(soundPacks: Pack[], now: Date = new Date()): strin
   const wanted = slot === "morning" ? settings.tod_morning : slot === "afternoon" ? settings.tod_afternoon : settings.tod_night;
   if (!wanted) return null;
   return soundPacks.some((p) => p.music && p.name === wanted) ? wanted : null;
+}
+
+// The time-of-day pack plays once per part of the day. That is remembered in the config, so switching
+// to Desktop Mode and back, or waking the Deck, does not play it again.
+// The night runs past midnight: 00:00-04:59 belongs to the night that started the day before.
+export function timeOfDaySlotKey(now: Date = new Date()): string {
+  const day = new Date(now.getTime());
+  if (now.getHours() < 5) day.setDate(day.getDate() - 1);
+  const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+  return `${key}|${slotForHour(now.getHours())}`;
+}
+
+/** The time-of-day pack, if it has not played yet in this part of the day. */
+export function timeOfDayDue(soundPacks: Pack[], now: Date = new Date()): string | null {
+  const pack = timeOfDayPack(soundPacks, now);
+  return pack && settings.tod_played !== timeOfDaySlotKey(now) ? pack : null;
+}
+
+export function markTimeOfDayPlayed(now: Date = new Date()): void {
+  const key = timeOfDaySlotKey(now);
+  if (settings.tod_played === key) return;
+  settings.tod_played = key;
+  try {
+    Promise.resolve(python.setConfig({ tod_played: key })).catch(() => {});
+  } catch {
+    // not saved: at worst it plays once more after a restart
+  }
 }

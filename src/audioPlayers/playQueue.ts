@@ -1,6 +1,6 @@
 import { Pack } from "../classes";
 import { settings } from "../settings";
-import { pickReplayMusic, slotForHour, timeOfDayPack } from "./dailyMusic";
+import { markTimeOfDayPlayed, pickReplayMusic, timeOfDayDue, timeOfDayPack } from "./dailyMusic";
 import { rotationMusicNames } from "./steamMusic";
 
 // "Up Next": the music that comes after the current one is chosen ahead of time and remembered,
@@ -52,15 +52,10 @@ function queuedPick(packs: Pack[], current: string): string | null {
 // the day is played once when the part of the day starts (or when the Deck starts). After that the
 // shuffle goes on as normal. Without this rule, every replay would pick the same time-of-day pack
 // again, and that music seemed to loop by itself.
-let todAppliedSlot: string | null = null;
-
-const currentSlot = (): string => slotForHour(new Date().getHours());
-
 /** The time-of-day pack that should play next (it was not played yet in this part of the day), or null. */
 function todForReplay(packs: Pack[], current: string): string | null {
-  const tod = timeOfDayPack(packs);
-  if (!tod || tod === current) return null;
-  return todAppliedSlot === currentSlot() ? null : tod;
+  const tod = timeOfDayDue(packs);
+  return tod && tod !== current ? tod : null;
 }
 
 /**
@@ -80,7 +75,7 @@ export function peekSkip(packs: Pack[], current: string): string | null {
 
 // Called when the time-of-day pack is what plays now (for example right after the Deck started)
 function noteTimeOfDayPlaying(packs: Pack[], current: string): void {
-  if (timeOfDayPack(packs) === current) todAppliedSlot = currentSlot();
+  if (timeOfDayPack(packs) === current) markTimeOfDayPlayed();
 }
 
 /** The chosen next music, used up: the following one is chosen fresh. */
@@ -88,7 +83,7 @@ export function takeQueued(packs: Pack[], current: string): string | null {
   noteTimeOfDayPlaying(packs, current);
   const tod = todForReplay(packs, current);
   if (tod) {
-    todAppliedSlot = currentSlot();
+    markTimeOfDayPlayed();
     queued = null;
     return tod;
   }
@@ -100,7 +95,7 @@ export function takeQueued(packs: Pack[], current: string): string | null {
 export function takeSkip(packs: Pack[], current: string): string | null {
   noteTimeOfDayPlaying(packs, current);
   const name = peekSkip(packs, current);
-  if (name && name === timeOfDayPack(packs)) todAppliedSlot = currentSlot();
+  if (name && name === timeOfDayPack(packs)) markTimeOfDayPlayed();
   queued = null;
   return name;
 }

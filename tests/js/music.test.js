@@ -217,3 +217,73 @@ test("Time of Day: the Up Next line never shows the music that is playing now", 
   }
   loadSettings({});
 });
+
+// ---- Repeats with a large library ----
+const daily = require("../../src/audioPlayers/dailyMusic.ts");
+
+// 300 tracks in 30 albums of very different sizes (like Steam soundtracks)
+function bigLibrary() {
+  const names = [];
+  const sizes = [2, 3, 4, 5, 40, 60, 2, 3, 30, 8, 2, 2, 25, 6, 10, 12, 3, 4, 20, 9, 2, 5, 7, 11, 3, 2, 6, 15, 4, 0];
+  sizes[29] = 300 - sizes.reduce((a, b) => a + b, 0);
+  sizes.forEach((n, a) => { for (let i = 0; i < n; i++) names.push(`Album ${a} - Track ${i}`); });
+  return names;
+}
+
+function playMany(pick, names, count) {
+  let recent = [];
+  let current = names[0];
+  const played = [];
+  for (let i = 0; i < count; i++) {
+    current = pick(names, current, recent);
+    played.push(current);
+    recent = [...recent.filter((n) => n !== current), current].slice(-600);
+  }
+  return played;
+}
+
+test("Smart Shuffle: with 300 tracks, 200 plays in a row have no repeats", () => {
+  loadSettings({ variety_level: 100 });
+  const names = bigLibrary();
+  const played = playMany((n, c, r) => chooseVaried(n, c, r), names, 200);
+  assert.equal(new Set(played).size, played.length);
+});
+
+test("Shuffle: with 300 tracks, 150 plays in a row have no repeats", () => {
+  loadSettings({});
+  const names = bigLibrary();
+  const played = playMany((n, c, r) => daily.shufflePick(n, c, r), names, 150);
+  assert.equal(new Set(played).size, played.length);
+});
+
+test("tracks of small albums do not come up far more often than others", () => {
+  loadSettings({ variety_level: 0 });
+  const names = bigLibrary();
+  const counts = {};
+  for (let i = 0; i < 20000; i++) {
+    const p = chooseVaried(names, "", [], Math.random, { variety: 50, favorites: [], blocked: [] });
+    counts[p] = (counts[p] || 0) + 1;
+  }
+  const small = counts["Album 0 - Track 0"] || 0; // album of 2
+  const big = counts["Album 5 - Track 0"] || 0; // album of 60
+  // equal album chances gave a 30x difference; now about sqrt(60/2) = 5.5x
+  assert.ok(small < big * 9, `small album track ${small}, big album track ${big}`);
+  loadSettings({});
+});
+
+test("the time-of-day pack plays once per part of the day, also after a restart", () => {
+  const packs = [{ name: "Morning Pack", music: true, mappings: {} }, { name: "Other", music: true, mappings: {} }];
+  const nine = new Date(2026, 10, 13, 9, 0);
+  loadSettings({ tod_enabled: true, tod_morning: "Morning Pack" });
+  assert.equal(daily.timeOfDayDue(packs, nine), "Morning Pack");
+  daily.markTimeOfDayPlayed(nine);
+  const saved = daily.timeOfDaySlotKey(nine);
+  // a restart (Desktop Mode and back) loads the saved settings again
+  loadSettings({ tod_enabled: true, tod_morning: "Morning Pack", tod_played: saved });
+  assert.equal(daily.timeOfDayDue(packs, new Date(2026, 10, 13, 11, 30)), null);
+  // the next morning it plays again
+  assert.equal(daily.timeOfDayDue(packs, new Date(2026, 10, 14, 9, 0)), "Morning Pack");
+  // 01:00 still belongs to the night that started the day before
+  assert.equal(daily.timeOfDaySlotKey(new Date(2026, 10, 14, 1, 0)), daily.timeOfDaySlotKey(new Date(2026, 10, 13, 22, 0)));
+  loadSettings({});
+});
