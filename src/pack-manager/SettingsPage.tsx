@@ -3,6 +3,7 @@ import { SiWebauthn } from "react-icons/si";
 import { useState, VFC } from "react";
 import { logInWithShortToken, logOut } from "../api";
 import { useGlobalState } from "../state";
+import { StoragePanel } from "./StoragePanel";
 
 export const SettingsPage: VFC = () => {
   const { apiShortToken, apiFullToken, apiMeData } = useGlobalState();
@@ -152,6 +153,7 @@ export const SettingsPage: VFC = () => {
           </div>
         </div>
       </Focusable>
+      <StoragePanel />
     </div>
   );
 };

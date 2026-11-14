@@ -26,6 +26,14 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 - To put them on controller buttons: Steam Settings > Controller > **Guide Button Chord Layout** > Edit (works everywhere in Steam, with Steam held), or any game's controller layout. Pick a button, then **Keyboard > Numpad**: Play, Stop, Next, Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
 - Nothing happens while a game is running (the music is paused then, and the keys belong to the game).
 
+**Find Music** (Pack Manager, in progress)
+- Off and greyed out until you press **Set Up Find Music**. Set up downloads **yt-dlp** (about 40 MB), a free open-source downloader, only from its official GitHub releases, with its checksum checked. It updates itself (once a day, and right away when a download fails), keeps the previous version for **Undo**, and can be **Removed**.
+- When YouTube or SoundCloud changes and no yt-dlp version works, a warning explains that Encore depends on yt-dlp and is waiting for its fix. Installed packs are never affected.
+- Search and adding songs arrive in the next version.
+
+**Storage** (Pack Manager > Settings)
+- How much space each part of Encore uses, on a bar for the whole drive and one for Encore alone. **Clean Up** deletes only files that are safe to delete, and asks first.
+
 **Steam Music tab**
 - Lists every track of the Steam soundtracks you own and have downloaded (in `steamapps/music`, on the internal drive and on SD cards or other library drives). Download a soundtrack in Steam, then press **Scan Again**. The list is also refreshed each time the plugin starts.
 - Tracks are grouped by soundtrack, with the cover, title, artist and track number. Pick a track to play it as menu music (Enable Legacy Features must be on). It then works with the other music options (Normalize Music Volume, Muffled Music, Now Playing, Smooth Fades...).

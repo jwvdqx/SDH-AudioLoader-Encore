@@ -189,3 +189,70 @@ export function getPluginVersion(): Promise<any> {
 export function checkForUpdate(): Promise<any> {
   return server!.callPluginMethod("check_for_update", {});
 }
+
+// ---- Find Music downloader tools and storage (see downloader_tools.py and storage.py) ----
+
+export interface ToolInfo {
+  installed: boolean;
+  has_previous: boolean;
+  bytes: number;
+  version?: string;
+  tag?: string;
+  channel?: string;
+  last_check?: number;
+  last_ok?: number;
+  previous?: { version?: string };
+}
+export interface ToolsStatus {
+  setup: boolean;
+  tools: Record<string, ToolInfo>;
+  broken: Record<string, { since: number; error: string; version?: string }>;
+  error?: string;
+}
+
+export function toolsStatus(): Promise<ToolsStatus | null> {
+  return server!
+    .callPluginMethod<{}, ToolsStatus>("tools_status", {})
+    .then((r) => (r.success ? r.result : null))
+    .catch(() => null);
+}
+
+export function toolsAction(action: "setup" | "update" | "undo" | "remove", name = "yt-dlp"): Promise<{ ok: boolean; error?: string; status?: ToolsStatus }> {
+  return server!
+    .callPluginMethod<{ action: string; name: string }, any>("tools_action", { action, name })
+    .then((r) => (r.success ? r.result : { ok: false, error: String(r.result) }))
+    .catch((e) => ({ ok: false, error: String(e) }));
+}
+
+export interface StorageUsage {
+  parts: Record<string, number>;
+  counts: Record<string, number>;
+  drive: { total: number; used: number; free: number };
+}
+
+export function storageUsage(): Promise<StorageUsage | null> {
+  return server!
+    .callPluginMethod<{}, StorageUsage>("storage_usage", {})
+    .then((r) => (r.success ? r.result : null))
+    .catch(() => null);
+}
+
+export interface CleanupItem {
+  id: string;
+  label: string;
+  bytes: number;
+}
+
+export function storageCleanupPlan(): Promise<CleanupItem[]> {
+  return server!
+    .callPluginMethod<{}, CleanupItem[]>("storage_cleanup_plan", {})
+    .then((r) => (r.success && Array.isArray(r.result) ? r.result : []))
+    .catch(() => []);
+}
+
+export function storageCleanup(ids: string[]): Promise<{ freed: number; done: string[] } | null> {
+  return server!
+    .callPluginMethod<{ ids: string[] }, { freed: number; done: string[] }>("storage_cleanup", { ids })
+    .then((r) => (r.success ? r.result : null))
+    .catch(() => null);
+}

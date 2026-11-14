@@ -45,6 +45,8 @@ export interface Settings {
   steam_music_in_rotation: boolean;
   /** Media keys (Play, Stop, Next, Prev, also sent by Steam Input) control the menu music. */
   media_keys: boolean;
+  /** Find Music downloads go on while a game runs (off: they pause, and continue afterwards). */
+  download_during_games: boolean;
   ui_tab: string;
   ui_collapsed: Record<string, boolean>;
 }
@@ -71,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hide_descriptions: false,
   steam_music_in_rotation: false,
   media_keys: true,
+  download_during_games: false,
   ui_tab: "music",
   ui_collapsed: {},
 };
@@ -132,6 +135,7 @@ export function loadSettings(data: any): void {
   settings.hide_descriptions = d.hide_descriptions === true;
   settings.steam_music_in_rotation = d.steam_music_in_rotation === true;
   settings.media_keys = d.media_keys !== false;
+  settings.download_during_games = d.download_during_games === true;
   settings.ui_tab = typeof d.ui_tab === "string" ? d.ui_tab : DEFAULT_SETTINGS.ui_tab;
   const collapsed: Record<string, boolean> = {};
   if (d.ui_collapsed && typeof d.ui_collapsed === "object") {
