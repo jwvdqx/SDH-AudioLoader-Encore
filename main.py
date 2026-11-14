@@ -74,6 +74,34 @@ def read_plugin_version() -> str:
         Log("Audio Loader - Could not read the plugin version: {}".format(e))
         return ""
 
+def read_config_file(path: str) -> dict:
+    # A damaged file (cut off by a power loss, for example) is kept as config.json.broken and the
+    # defaults are used, so the plugin still starts and the next save does not lose everything else
+    try:
+        with open(path, "r") as fp:
+            data = json.load(fp)
+        if isinstance(data, dict):
+            return data
+        raise ValueError("not a settings object")
+    except FileNotFoundError:
+        return dict(starter_config_data)
+    except Exception as e:
+        Log("Audio Loader - The config file is damaged ({}), starting from the defaults. A copy is kept as config.json.broken".format(e))
+        try:
+            shutil.copyfile(path, path + ".broken")
+        except Exception:
+            pass
+        return dict(starter_config_data)
+
+def write_config_file(path: str, data: dict):
+    # Written to a temporary file first, then swapped in: a power loss never leaves a half-written file
+    tmp = path + ".tmp"
+    with open(tmp, "w") as fp:
+        fp.write(json.dumps(data))
+        fp.flush()
+        os.fsync(fp.fileno())
+    os.replace(tmp, path)
+
 class Result:
     def __init__(self, success : bool, message : str = "Success"):
         self.success = success
@@ -206,10 +234,9 @@ class Plugin:
         Log("Audio Loader - Fetching config file at {}".format(configPath))
         if (os.path.exists(configPath)):
             Log("Audio Loader - Found config file")
-            with open(configPath, "r") as fp:
-                data = json.load(fp)
-                self.config = data
-                return data
+            data = read_config_file(configPath)
+            self.config = data
+            return data
 
     async def set_config(self, configObj: object):
         configPath = os.path.join(get_pack_path(), 'config.json')
@@ -219,16 +246,10 @@ class Plugin:
             Log("Audio Loader - Found config file")
             # Merge into the saved config so settings the caller did not send
             # (like the daily music settings) are never lost
-            merged = {}
-            try:
-                with open(configPath, "r") as fp:
-                    merged = json.load(fp)
-            except Exception as e:
-                Log("Audio Loader - Could not read old config, starting fresh: {}".format(e))
+            merged = read_config_file(configPath)
             merged.update(configObj)
             self.config = merged
-            with open(configPath, "w") as fp:
-                fp.write(json.dumps(merged))
+            write_config_file(configPath, merged)
             return True
 
     # async def download_pack(self, uuid: str) -> dict:
@@ -243,7 +264,7 @@ class Plugin:
                 break
         
         if (pack == None):
-            return Result(False, f"Could not find {name}")
+            return Result(False, f"Could not find {name}").to_dict()
         
         result = await pack.delete()
         if not result.success:

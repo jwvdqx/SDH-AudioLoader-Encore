@@ -50,7 +50,9 @@ export function forceUpdateCheck(): Promise<void> {
             : `Update check: installed v${info.current}, newest v${info.latest}`
         );
       } else {
-        info = { current: "", latest: "", url: "", error: "no answer from the backend" };
+        // Decky sends the reason as the result when the backend failed
+        const reason = typeof r?.result === "string" && r.result ? r.result : "no answer from the backend";
+        info = { current: "", latest: "", url: "", error: reason };
       }
     } catch (e) {
       info = { current: "", latest: "", url: "", error: String(e) };
