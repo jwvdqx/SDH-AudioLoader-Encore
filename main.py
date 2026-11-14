@@ -11,6 +11,8 @@ sys.path.append(os.path.dirname(__file__))
 from audio_utils import store_read as util_store_read, store_write as util_store_write, get_steam_path, get_pack_path, AUDIO_LOADER_VERSION, DECKY_HOME, DECKY_USER_HOME
 from audio_remoteinstall import install
 import steam_music
+import downloader_tools
+import storage
 
 starter_config_data = {
   "selected_pack": "Default",
@@ -73,6 +75,23 @@ def read_plugin_version() -> str:
     except Exception as e:
         Log("Audio Loader - Could not read the plugin version: {}".format(e))
         return ""
+
+def tools_folder() -> str:
+    # Decky's data folder for this plugin: a new Encore version does not replace it
+    folder = os.environ.get("DECKY_PLUGIN_RUNTIME_DIR") or os.path.join(DECKY_HOME, "data", "Audio Loader Encore")
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+_tools = None
+
+def get_tools():
+    global _tools
+    if _tools is None:
+        _tools = downloader_tools.Tools(tools_folder())
+    return _tools
+
+def log_folder():
+    return os.environ.get("DECKY_PLUGIN_LOG_DIR") or ""
 
 def read_config_file(path: str) -> dict:
     # A damaged file (cut off by a power loss, for example) is kept as config.json.broken and the
@@ -197,6 +216,51 @@ class Plugin:
         except Exception as e:
             Log("Audio Loader - Update check failed: {}".format(e))
             return {"current": current, "latest": "", "url": "", "error": str(e)}
+
+    # ---- Find Music: the downloader tools (see downloader_tools.py). Nothing runs before Set up.
+
+    async def tools_status(self) -> dict:
+        try:
+            return get_tools().status()
+        except Exception as e:
+            return {"setup": False, "tools": {}, "broken": {}, "error": str(e)}
+
+    async def tools_action(self, action: str, name: str = "yt-dlp") -> dict:
+        # action: "setup", "update", "undo", "remove". Slow work runs outside the event loop.
+        tools = get_tools()
+        jobs = {
+            "setup": lambda: tools.setup(),
+            "update": lambda: tools.install(name, tools.info(name).get("channel") or "stable"),
+            "undo": lambda: tools.undo(name),
+            "remove": lambda: tools.remove(),
+        }
+        if action not in jobs:
+            return {"ok": False, "error": "unknown action"}
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(None, jobs[action])
+            return {"ok": True, "result": result, "status": tools.status()}
+        except Exception as e:
+            Log("Audio Loader - Downloader {} failed: {}".format(action, e))
+            return {"ok": False, "error": str(e), "status": tools.status()}
+
+    # ---- Storage (see storage.py)
+
+    async def storage_usage(self) -> dict:
+        def work():
+            return storage.usage(get_pack_path(), get_tools(), log_folder(), steam_music.LINK_FOLDER)
+        return await asyncio.get_event_loop().run_in_executor(None, work)
+
+    async def storage_cleanup_plan(self) -> list:
+        config = read_config_file(os.path.join(get_pack_path(), "config.json"))
+        return storage.cleanup_plan(get_pack_path(), get_tools(), log_folder(), config)
+
+    async def storage_cleanup(self, ids: list) -> dict:
+        path = os.path.join(get_pack_path(), "config.json")
+        config = read_config_file(path)
+        freed, done = storage.run_cleanup(list(ids or []), get_pack_path(), get_tools(), log_folder(), config,
+                                          lambda c: write_config_file(path, c))
+        Log("Audio Loader - Clean-up freed {} bytes ({} items)".format(freed, len(done)))
+        return {"freed": freed, "done": done}
 
     async def log_message(self, message: str) -> bool:
         # Lets the screen side write into the Decky log, to help find problems

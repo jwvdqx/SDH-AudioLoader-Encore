@@ -51,6 +51,7 @@ import {
   StarredPacksPage,
   SubmissionsPage,
   MyPacksPage,
+  FindMusicPage,
 } from "./pack-manager";
 import { Content } from "./menu/Content";
 import * as python from "./python";
@@ -79,6 +80,11 @@ const PackManagerRouter: VFC = () => {
             title: "My Packs",
             content: <MyPacksPage />,
             id: "MyPacks",
+          },
+          {
+            title: "Find Music",
+            content: <FindMusicPage />,
+            id: "FindMusic",
           },
           {
             title: "Browse",

@@ -2,6 +2,36 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.9.0
+
+First part of **Find Music** (search SoundCloud and YouTube, add a song as a music pack). This version
+sets up the downloader; search and adding songs come next.
+
+### Added
+- **Find Music page** in the Pack Manager. It is off and greyed out until you press **Set Up Find Music**,
+  which explains what is downloaded and from where. Nothing is downloaded or run before that.
+- **Self-updating downloader.** Set up downloads **yt-dlp**, a free open-source downloader, only from its
+  official GitHub releases, and checks its SHA-256 checksum before using it (Encore runs as root, so
+  nothing else is accepted). It is kept in Decky's data folder, so Encore updates do not replace it.
+  - A new version is looked for at most once a day, and right away when a download fails.
+  - A new version must start and report its version before it replaces the old one; the old one is kept
+    (**Undo Last Update**).
+  - When a site stops working, Encore tries a new stable version, then yt-dlp's nightly channel, then the
+    version before. If nothing works it shows **"yt-dlp is broken for YouTube/SoundCloud, awaiting
+    fixes"**, with an explanation of why (Encore depends on yt-dlp, the sites change, fixes usually take a
+    few days). The warning goes away by itself once it works again. Installed packs are never affected.
+  - If GitHub's API is blocked or rate-limited, the newest version is read from the release page instead.
+  - **Update Now**, **Undo Last Update** and **Remove** (deletes the tools and switches Find Music off).
+  - Deno (needed only for YouTube) will be downloaded the first time YouTube is used.
+- **Keep Downloading While a Game Runs** switch (off by default: downloads will pause during games and
+  continue afterwards).
+- **Storage** (Pack Manager > Settings): a bar for the whole drive and one for Encore's parts (music packs,
+  downloaded music, sound packs, downloader tools and their previous versions, logs, settings and caches,
+  leftovers, Steam Music links), each with its size. **Clean Up** lists what is safe to delete (temporary
+  files, unfinished downloads, damaged-settings copies, old logs, previous tool versions once the current
+  one has worked for a week, loudness measurements of deleted files) and asks before deleting. It never
+  deletes packs, your settings or the tools in use.
+
 ## 1.8.0
 
 ### Added
