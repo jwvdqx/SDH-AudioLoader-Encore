@@ -256,3 +256,68 @@ export function storageCleanup(ids: string[]): Promise<{ freed: number; done: st
     .then((r) => (r.success ? r.result : null))
     .catch(() => null);
 }
+
+// ---- Find Music: search and download (see find_music.py) ----
+
+export interface FoundTrack {
+  site: string;
+  id: string;
+  url: string;
+  title: string;
+  uploader: string;
+  duration: number;
+  thumbnail: string;
+  long: boolean;
+  preview_only: boolean;
+  /** The pack folder when this track is already installed */
+  installed: string;
+  fill: TrackDetails;
+}
+export interface TrackDetails {
+  name: string;
+  artist: string;
+  description: string;
+  cover: string;
+}
+export interface SearchPage {
+  results: FoundTrack[];
+  page: number;
+  last_page: boolean;
+  error?: string;
+}
+export interface DownloadJob {
+  state: "starting" | "downloading" | "paused" | "done" | "failed" | "cancelled";
+  name: string;
+  folder: string;
+  site: string;
+  progress: number;
+  error: string;
+}
+
+export function findMusicSearch(site: string, query: string, page: number): Promise<SearchPage> {
+  return server!
+    .callPluginMethod<{ site: string; query: string; page: number }, SearchPage>("find_music_search", { site, query, page })
+    .then((r) => (r.success ? r.result : { results: [], page, last_page: true, error: String(r.result) }))
+    .catch((e) => ({ results: [], page, last_page: true, error: String(e) }));
+}
+
+export function findMusicDownload(track: FoundTrack, details: TrackDetails): Promise<{ ok: boolean; error?: string; duplicate?: string }> {
+  return server!
+    .callPluginMethod<any, any>("find_music_download", { site: track.site, track_id: track.id, url: track.url, details })
+    .then((r) => (r.success ? r.result : { ok: false, error: String(r.result) }))
+    .catch((e) => ({ ok: false, error: String(e) }));
+}
+
+export function findMusicJob(): Promise<DownloadJob | null> {
+  return server!
+    .callPluginMethod<{}, { job: DownloadJob | null }>("find_music_job", {})
+    .then((r) => (r.success ? r.result.job : null))
+    .catch(() => null);
+}
+
+export function findMusicControl(action: "pause" | "resume" | "cancel" | "clear"): Promise<DownloadJob | null> {
+  return server!
+    .callPluginMethod<{ action: string }, { job: DownloadJob | null }>("find_music_control", { action })
+    .then((r) => (r.success ? r.result.job : null))
+    .catch(() => null);
+}

@@ -128,8 +128,14 @@ const ActionButton: VFC<{
   </DialogButton>
 );
 
-const PackCard: VFC<{
+const SITE_LABELS: Record<string, string> = { soundcloud: "SoundCloud", youtube: "YouTube" };
+
+export const PackCard: VFC<{
   pack: Pack | null; // null: Steam's default sounds
+  /** A picture to show instead of the pack's own (the Find Music preview) */
+  coverUrl?: string;
+  /** Only the card, without buttons (the Find Music preview) */
+  previewOnly?: boolean;
   remote?: RemoteInfo;
   apiUrl: string;
   playing: boolean;
@@ -148,7 +154,11 @@ const PackCard: VFC<{
   const [hint, setHint] = useState("");
   const music = !!pack?.music;
   const image = remote?.remote?.images?.[0]?.id;
-  const hasImage = !!image && image !== "MISSING";
+  // A song added with Find Music has its own cover in its folder
+  const localCover = pack?.source?.cover ? `/sounds_custom/${pack.truncatedPackPath}/${pack.source.cover}` : "";
+  const imageUrl = props.coverUrl ?? (localCover || (image && image !== "MISSING" ? `${apiUrl}/blobs/${image}` : ""));
+  const hasImage = imageUrl !== "";
+  const site = pack?.source?.site ? SITE_LABELS[pack.source.site] || pack.source.site : "";
   const name = pack ? pack.name : "Steam Default Sounds";
   const outdated = remote?.status === "outdated";
 
@@ -173,7 +183,7 @@ const PackCard: VFC<{
           position: "relative",
           backgroundColor: "#21323d",
           backgroundImage: hasImage
-            ? `url(${apiUrl}/blobs/${image})`
+            ? `url("${imageUrl}")`
             : music
               ? "linear-gradient(135deg, #5a3a8a, #1e1e3a)"
               : "linear-gradient(135deg, #2f5a8a, #1a2a3a)",
@@ -193,6 +203,7 @@ const PackCard: VFC<{
           <span style={chip(music ? "rgba(120, 70, 190, 0.9)" : "rgba(40, 110, 180, 0.9)")}>
             {music ? "Music" : "Sounds"}
           </span>
+          {site !== "" && <span style={chip("rgba(255, 85, 0, 0.9)")}>{site}</span>}
           {props.favorite && <span style={chip("rgba(200, 150, 30, 0.9)")}>★</span>}
           {props.blocked && <span style={chip("rgba(150, 60, 60, 0.9)")}>Never pick</span>}
         </div>
@@ -245,7 +256,8 @@ const PackCard: VFC<{
           )}
         </div>
       </div>
-      {/* @ts-ignore */}
+      {!props.previewOnly && (
+      // @ts-ignore
       <Focusable
         flow-children="row"
         style={{ display: "flex", gap: "4px", padding: "4px 8px 8px" }}
@@ -298,6 +310,7 @@ const PackCard: VFC<{
           </>
         )}
       </Focusable>
+      )}
     </div>
   );
 };
@@ -419,7 +432,9 @@ export const MyPacksPage: VFC = () => {
               {p.packPath}
             </div>
             <div style={{ opacity: 0.6, fontSize: "11px", marginTop: "4px" }}>
-              Not on the pack website (installed by hand).
+              {p.source
+                ? `Added with Find Music from ${SITE_LABELS[p.source.site] || p.source.site}: ${p.source.url}`
+                : "Not on the pack website (installed by hand)."}
             </div>
           </div>
         }

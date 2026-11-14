@@ -13,6 +13,7 @@ from audio_remoteinstall import install
 import steam_music
 import downloader_tools
 import storage
+import find_music
 
 starter_config_data = {
   "selected_pack": "Default",
@@ -90,6 +91,14 @@ def get_tools():
         _tools = downloader_tools.Tools(tools_folder())
     return _tools
 
+_downloads = None
+
+def get_downloads():
+    global _downloads
+    if _downloads is None:
+        _downloads = find_music.Downloads(get_tools(), get_pack_path())
+    return _downloads
+
 def log_folder():
     return os.environ.get("DECKY_PLUGIN_LOG_DIR") or ""
 
@@ -147,6 +156,9 @@ class Pack:
         self.mappings = json["mappings"] if ("mappings" in json) else {}
         self.music = bool(json["music"]) if ("music" in json) else False
         self.id = json["id"] if ("id" in json) else self.name
+        # Packs made by Find Music: where the song came from (site, id, link, cover)
+        source = json.get("encore_source")
+        self.source = source if isinstance(source, dict) else None
         
 
         if (AUDIO_LOADER_VERSION < self.require):
@@ -179,7 +191,8 @@ class Pack:
             "hasIntro": self.has_intro,
             "packPath": self.packPath,
             "truncatedPackPath": self.truncatedPackPath,
-            "id": self.id
+            "id": self.id,
+            "source": self.source
         }
 
 class Plugin:
@@ -242,6 +255,44 @@ class Plugin:
         except Exception as e:
             Log("Audio Loader - Downloader {} failed: {}".format(action, e))
             return {"ok": False, "error": str(e), "status": tools.status()}
+
+    # ---- Find Music: search and download (see find_music.py)
+
+    async def find_music_search(self, site: str, query: str, page: int = 1) -> dict:
+        tools = get_tools()
+        if not tools.is_set_up():
+            return {"results": [], "page": page, "last_page": True, "error": "not set up"}
+        def work():
+            return find_music.search(tools, site, query, page, get_pack_path())
+        try:
+            return await asyncio.get_event_loop().run_in_executor(None, work)
+        except Exception as e:
+            Log("Audio Loader - Find Music search failed: {}".format(e))
+            return {"results": [], "page": page, "last_page": True, "error": str(e)}
+
+    async def find_music_download(self, site: str, track_id: str, url: str, details: dict) -> dict:
+        if not get_tools().is_set_up():
+            return {"ok": False, "error": "Find Music is not set up."}
+        try:
+            return get_downloads().start(site, str(track_id), url, dict(details or {}))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    async def find_music_job(self) -> dict:
+        return {"job": get_downloads().status()}
+
+    async def find_music_control(self, action: str) -> dict:
+        # "pause", "resume" (a game started or ended), "cancel", "clear" (forget a finished job)
+        d = get_downloads()
+        if action == "pause":
+            d.pause(True)
+        elif action == "resume":
+            d.pause(False)
+        elif action == "cancel":
+            d.cancel()
+        elif action == "clear":
+            d.clear()
+        return {"job": d.status()}
 
     # ---- Storage (see storage.py)
 
