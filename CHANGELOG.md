@@ -2,6 +2,22 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.8.0
+
+### Added
+- **My Packs**, the new first page of the Pack Manager: every installed pack as a card in a grid, split into
+  Music and Sounds. Each card shows the picture, author, version, plays and badges (Playing, In use,
+  Favorite, Never pick, Update), with quick buttons: play / use, favorite, never pick, update, details and
+  uninstall (with a confirmation). Filter, sort (name, most or least played) and search. A Steam Default
+  Sounds card switches back to Steam's own sounds. Uninstalling the music or sound pack that is in use now
+  also stops it or switches back to the default sounds.
+
+### Changed
+- The **Uninstall** page is replaced by My Packs.
+- **Library tab** (menu): the Favorites & Blocked dropdowns moved to the cards in My Packs. The tab now shows
+  a summary and buttons for My Packs and Browse New Packs, plus the play stats.
+- Playing music by hand works the same everywhere (Music tab, Steam Music tab, My Packs).
+
 ## 1.7.0
 
 Performance. Includes 1.6.9 (never released on its own).

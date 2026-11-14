@@ -49,7 +49,7 @@ import {
   SettingsPage,
   StarredPacksPage,
   SubmissionsPage,
-  UninstallPage,
+  MyPacksPage,
 } from "./pack-manager";
 import { Content } from "./menu/Content";
 import * as python from "./python";
@@ -75,6 +75,11 @@ const PackManagerRouter: VFC = () => {
         }}
         tabs={[
           {
+            title: "My Packs",
+            content: <MyPacksPage />,
+            id: "MyPacks",
+          },
+          {
             title: "Browse",
             content: <PackBrowserPage />,
             id: "BrowsePacks",
@@ -97,11 +102,6 @@ const PackManagerRouter: VFC = () => {
                   : []),
               ]
             : []),
-          {
-            title: "Uninstall",
-            content: <UninstallPage />,
-            id: "UninstallPacks",
-          },
           {
             title: "Settings",
             content: <SettingsPage />,
