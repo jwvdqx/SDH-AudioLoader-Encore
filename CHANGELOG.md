@@ -2,6 +2,21 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.6.7
+
+### Fixed
+- **Too many repeats with a large library** (for example many Steam soundtrack tracks). In a test with 300
+  tracks, the old rules repeated about 10 tracks in every 100 plays; now none do. Causes and fixes:
+  - **Smart Shuffle** only avoided the last 12 packs, whatever the size of the library. At Variety 100 it now
+    avoids the last 75% of the library (lower Variety avoids proportionally less). The saved play history
+    now holds 600 entries instead of 30.
+  - **Shuffle** had no memory at all. It is still random, but now skips everything from the last half of
+    the library.
+  - Every album (series) had the same chance, so each track of a 2-track album played up to 30 times more
+    often than a track of a 60-track album. Albums now count by the square root of their size.
+  - **Music by Time of Day** played its pack again every time Gaming Mode started (switching back from
+    Desktop Mode) and after every wake-up. It now plays once per part of the day, and that is saved.
+
 ## 1.6.6
 
 ### Added

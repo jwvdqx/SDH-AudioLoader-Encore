@@ -37,7 +37,8 @@ import {
   stopMusicLowPassAudio,
   startMusicLowPassContextMonitor,
   configureMusicLowPass,
-  timeOfDayPack,
+  timeOfDayDue,
+  markTimeOfDayPlayed,
   STARTUP_APPEAR_MS,
   waitForMovies,
 } from "./audioPlayers";
@@ -307,7 +308,9 @@ export default definePlugin((serverApi: ServerAPI) => {
       let musicToPlay = configSelectedMusic;
       let newDay = false;
       // "Music by Time of Day" decides first, when it has a choice for this part of the day
-      const timePick = configLegacyEnabled ? timeOfDayPack(soundPacks) : null;
+      // Only once per part of the day: coming back from Desktop Mode does not play it again
+      const timePick = configLegacyEnabled ? timeOfDayDue(soundPacks) : null;
+      if (timePick) markTimeOfDayPlayed();
       if (timePick) {
         musicToPlay = timePick;
         setGlobalState("selectedMusic", timePick);

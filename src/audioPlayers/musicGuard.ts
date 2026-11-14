@@ -1,7 +1,7 @@
 import { GlobalState } from "../state/GlobalState";
 import * as python from "../python";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
-import { getTodayKey, pickReplayMusic, pickTodaysMusic, timeOfDayPack } from "./dailyMusic";
+import { getTodayKey, markTimeOfDayPlayed, pickReplayMusic, pickTodaysMusic, timeOfDayDue, timeOfDayPack } from "./dailyMusic";
 import { endSleepTimerPause } from "./limits";
 import { invalidateQueue, takeQueued, takeSkip } from "./playQueue";
 import { PlayMode, PLAY_MODES, settings, updateSetting } from "../settings";
@@ -9,7 +9,7 @@ import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v1.6.6";
+export const BUILD_TAG = "v1.6.7";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -211,7 +211,9 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
     let musicToPlay = s.selectedMusic;
     // A new day after sleeping means a new pick for "New Music Every Day"
     let newDay = false;
-    const timePick = reason === "wake" ? timeOfDayPack(s.soundPacks) : null;
+    // Only once per part of the day (a wake-up does not play it again)
+    const timePick = reason === "wake" ? timeOfDayDue(s.soundPacks) : null;
+    if (timePick) markTimeOfDayPlayed();
     if (timePick) {
       musicToPlay = timePick;
       setGlobalState("selectedMusic", timePick);

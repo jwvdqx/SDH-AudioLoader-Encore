@@ -29,6 +29,8 @@ export interface Settings {
   tod_morning: string;
   tod_afternoon: string;
   tod_night: string;
+  /** The part of the day whose time-of-day pack already played ("2026-11-13|morning"). */
+  tod_played: string;
   favorite_music: string[];
   blocked_music: string[];
   battery_saver: boolean;
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tod_morning: "",
   tod_afternoon: "",
   tod_night: "",
+  tod_played: "",
   favorite_music: [],
   blocked_music: [],
   battery_saver: false,
@@ -109,6 +112,7 @@ export function loadSettings(data: any): void {
   settings.tod_morning = typeof d.tod_morning === "string" ? d.tod_morning : "";
   settings.tod_afternoon = typeof d.tod_afternoon === "string" ? d.tod_afternoon : "";
   settings.tod_night = typeof d.tod_night === "string" ? d.tod_night : "";
+  settings.tod_played = typeof d.tod_played === "string" ? d.tod_played : "";
   settings.favorite_music = stringList(d.favorite_music);
   settings.blocked_music = stringList(d.blocked_music);
   settings.battery_saver = d.battery_saver === true;
