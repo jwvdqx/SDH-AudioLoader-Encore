@@ -39,6 +39,9 @@ class FakeTools:
         return {"broken": self.broken}
 
     def ensure(self, name):
+        self.ensured = (self.ensured or []) + [name]
+        if name == "deno":
+            self.has_deno = True
         return "current"
 
     def path(self, name):
@@ -46,6 +49,24 @@ class FakeTools:
 
     def mark_ok(self, name, site=None):
         self.ok.append(site)
+
+    # YouTube support
+    has_deno = True
+    prefs = None
+    blocked_marks = None
+    ensured = None
+
+    def installed(self, name):
+        return name != "deno" or self.has_deno
+
+    def pref(self, key, default=None):
+        return (self.prefs or {}).get(key, default)
+
+    def set_pref(self, key, value):
+        self.prefs = dict(self.prefs or {}, **{key: value})
+
+    def mark_blocked(self, site, error):
+        self.blocked_marks = (self.blocked_marks or []) + [site]
 
 
 class AutoFill(unittest.TestCase):
@@ -197,6 +218,96 @@ class Download(unittest.TestCase):
         os.makedirs(os.path.join(self.packs, "Artist_-_Song"))
         self.assertEqual(fm.folder_name("Artist - Song", self.packs), "Artist_-_Song_2")
         self.assertNotIn("/", fm.folder_name("../../etc/passwd", self.packs))
+
+
+
+class YouTube(unittest.TestCase):
+    def test_every_kind_of_youtube_link_gives_the_same_id(self):
+        for url in ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ?t=42",
+                    "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ&t=30s", "https://youtube.com/shorts/dQw4w9WgXcQ",
+                    "https://music.youtube.com/watch?v=dQw4w9WgXcQ&list=RD123", "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                    "dQw4w9WgXcQ"):
+            self.assertEqual(fm.youtube_id(url), "dQw4w9WgXcQ", url)
+        self.assertEqual(fm.youtube_id("https://example.com/watch"), "")
+
+    def test_a_bot_check_is_not_a_broken_yt_dlp(self):
+        err = "ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser"
+        self.assertTrue(fm.is_bot_check(err))
+        self.assertFalse(fm.is_site_error(err))
+
+    def test_youtube_search_uses_the_quick_list_and_deno(self):
+        entries = [{"id": "dQw4w9WgXcQ", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "title": "Song (Official Video)",
+                    "channel": "Singer", "duration": 212, "view_count": 5,
+                    "thumbnails": [{"url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "width": 480, "height": 360}]}]
+        tools = FakeTools(tempfile.mkdtemp(), results=entries)
+        r = fm.search(tools, "youtube", "song", 1, tempfile.mkdtemp())
+        args = tools.calls[0]
+        self.assertIn("--flat-playlist", args)
+        self.assertIn("--js-runtimes", args)
+        self.assertEqual(args[-1], "ytsearch100:song")
+        t = r["results"][0]
+        self.assertEqual(t["id"], "dQw4w9WgXcQ")
+        self.assertEqual(t["url"], "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        self.assertEqual(t["fill"]["artist"], "Singer")
+        self.assertEqual(t["fill"]["name"], "Singer - Song")
+
+    def test_a_bot_check_during_search_shows_the_block_warning(self):
+        tools = FakeTools(tempfile.mkdtemp(), rc=1, stderr="ERROR: Sign in to confirm you're not a bot")
+        tools.status = lambda: {"broken": {}, "blocked": {"youtube": {"since": 1}}}
+        r = fm.search(tools, "youtube", "song", 1, tempfile.mkdtemp())
+        self.assertEqual(r["error"], "blocked")
+        self.assertEqual(tools.blocked_marks, ["youtube"])
+
+
+# A fake yt-dlp for YouTube: the clients named in FAIL answer with a bot check, the others work
+def youtube_script(failing):
+    return """#!/bin/sh
+out=""; client="default"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift;;
+    --extractor-args) client=$(echo "$2" | sed 's/.*player_client=//'); shift;;
+  esac; shift
+done
+for c in %s; do if [ "$c" = "$client" ]; then echo "ERROR: [youtube] x: Sign in to confirm you're not a bot" >&2; exit 1; fi; done
+echo "[download] 100.0%% of 1MiB"
+echo audio > $(echo "$out" | sed 's/%%(ext)s/m4a/')
+""" % " ".join(failing)
+
+
+class YouTubeDownload(unittest.TestCase):
+    def run_download(self, failing, has_deno=True):
+        packs = tempfile.mkdtemp()
+        tools = FakeTools(tempfile.mkdtemp(), script=youtube_script(failing))
+        tools.has_deno = has_deno
+        dl = fm.Downloads(tools, packs, get_cover=lambda url: b"jpg")
+        details = {"name": "Singer - Song", "artist": "Singer", "description": "", "cover": ""}
+        self.assertTrue(dl.start("youtube", "dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", details)["ok"])
+        end = time.time() + 10
+        while time.time() < end and dl.status()["state"] not in ("done", "failed"):
+            time.sleep(0.05)
+        return dl.status(), tools
+
+    def test_another_client_is_tried_and_remembered(self):
+        status, tools = self.run_download(["default"])
+        self.assertEqual(status["state"], "done", status.get("error"))
+        self.assertEqual(tools.prefs["youtube_client"], "tv")
+
+    def test_when_every_client_is_blocked_the_block_warning_is_shown(self):
+        status, tools = self.run_download(list(fm.YOUTUBE_CLIENTS))
+        self.assertEqual(status["state"], "failed")
+        self.assertEqual(status["error"], "blocked")
+        self.assertEqual(tools.blocked_marks, ["youtube"])
+
+    def test_deno_is_fetched_the_first_time_youtube_is_used(self):
+        status, tools = self.run_download([], has_deno=False)
+        self.assertEqual(status["state"], "done", status.get("error"))
+        self.assertIn("deno", tools.ensured)
+
+    def test_soundcloud_never_needs_deno(self):
+        tools = FakeTools(tempfile.mkdtemp())
+        tools.has_deno = False
+        self.assertEqual(fm.site_args(tools, "soundcloud"), [])
 
 
 if __name__ == "__main__":

@@ -29,8 +29,9 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 **Find Music** (Pack Manager)
 - Off and greyed out until you press **Set Up Find Music**. Set up downloads **yt-dlp** (about 40 MB), a free open-source downloader, only from its official GitHub releases, with its checksum checked. It updates itself (once a day, and right away when a download fails), keeps the previous version for **Undo**, and can be **Removed**.
 - When YouTube or SoundCloud changes and no yt-dlp version works, a warning explains that Encore depends on yt-dlp and is waiting for its fix. Installed packs are never affected.
-- **Search SoundCloud** (YouTube comes next): 10 results per page, with badges for songs already added, preview-only (Go+) tracks and very long ones. Moving down onto the page numbers selects the page you most likely want next (forward or back, following your direction); the last page hides a small λ.
+- **Search SoundCloud or YouTube**: 10 results per page, with badges for songs already added, preview-only (Go+) tracks and very long ones. Moving down onto the page numbers selects the page you most likely want next (forward or back, following your direction); the last page hides a small λ.
 - **Download** fills in the details automatically and shows the pack card as it will look in My Packs, with **OK** and **Edit** (clear buttons for each field, Clear All). Nothing downloads before OK.
+- **YouTube** needs **Deno** (about 90 MB), downloaded from its official releases the first time you download from YouTube. If YouTube asks to "confirm you're not a bot", a separate warning explains that this is a temporary block of the network, not a broken yt-dlp. Encore never signs in to your account.
 - Downloads run in the background with a progress bar, pause during games (unless **Keep Downloading While a Game Runs** is on) and continue afterwards. The same song is never added twice (Encore remembers each song's site and track id).
 
 **Storage** (Pack Manager > Settings)

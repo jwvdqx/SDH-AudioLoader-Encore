@@ -83,6 +83,60 @@ export const BrokenWarning: VFC<{ site: string; info: { since: number; error: st
   );
 };
 
+/** YouTube asked to confirm "you're not a bot": a temporary block, explained. */
+export const BlockedWarning: VFC<{ site: string; info: { since: number; error: string } }> = ({ site, info }) => {
+  const name = SITE_NAMES[site] || site;
+  const explain = () =>
+    showModal(
+      <ConfirmModal
+        bAlertDialog
+        strTitle={`${name} is asking to confirm you're not a bot`}
+        strOKButtonText="OK"
+        strDescription={
+          <div style={{ fontSize: "13px", lineHeight: 1.55 }}>
+            <p style={{ marginTop: 0 }}>
+              {name} sometimes blocks downloads from a network for a while, when it sees many requests from it. This is not a
+              broken yt-dlp, and no update fixes it: it goes away by itself, often within an hour.
+            </p>
+            <p>
+              Encore already tried the other ways yt-dlp can talk to {name}. It does not sign in to your account (that would mean
+              storing your login on the Deck). Try again later, or use SoundCloud meanwhile.
+            </p>
+            <p>
+              <b>Your installed packs are not affected.</b>
+            </p>
+            <p style={{ opacity: 0.7, fontSize: "12px", marginBottom: 0 }}>
+              Since {timeAgo(info.since)} · {info.error}
+            </p>
+          </div>
+        }
+      />
+    );
+  return (
+    <Focusable>
+      <DialogButton
+        onClick={explain}
+        style={{
+          width: "100%",
+          textAlign: "left",
+          display: "flex",
+          gap: "10px",
+          alignItems: "center",
+          background: "rgba(90, 60, 140, 0.55)",
+          border: "1px solid rgba(201, 160, 255, 0.6)",
+          color: "#eadcff",
+          marginBottom: "10px",
+        }}
+      >
+        <FaExclamationTriangle />
+        <span>
+          <b>{name} is asking to confirm you're not a bot.</b> A temporary block, not a broken yt-dlp. Try again later. Select for details.
+        </span>
+      </DialogButton>
+    </Focusable>
+  );
+};
+
 /** yt-dlp's version, update, undo, remove, and the "keep downloading during games" switch. */
 export const DownloaderPanel: VFC<{ status: python.ToolsStatus; onStatus: (s: python.ToolsStatus) => void }> = ({ status, onStatus }) => {
   const settings = useSettings();
@@ -114,7 +168,9 @@ export const DownloaderPanel: VFC<{ status: python.ToolsStatus; onStatus: (s: py
         </div>
         <div style={{ opacity: 0.75, fontSize: "12px" }}>
           From yt-dlp's official GitHub releases, checksum checked. New versions are looked for once a day, and right away when a
-          download fails. {deno?.installed ? `Deno ${deno.version || ""} is installed for YouTube.` : "Deno (for YouTube) is only downloaded the first time you use YouTube."}
+          download fails. {deno?.installed
+            ? `${(deno.version || "Deno").split(" (")[0]} is installed for YouTube (${formatBytes(deno.bytes || 0)}), and updated the same way.`
+            : "Deno (for YouTube, about 90 MB) is only downloaded the first time you download from YouTube."}
         </div>
       </div>
       <Focusable style={{ display: "flex", gap: "8px", flexWrap: "wrap", margin: "8px 0" }}>
@@ -191,7 +247,7 @@ const SetupCard: VFC<{ onDone: (s: python.ToolsStatus) => void }> = ({ onDone })
           Set up downloads <b>yt-dlp</b> (about 40 MB), a free open-source downloader, only from its official GitHub releases.
           Its checksum is checked before it is used.
         </li>
-        <li>For YouTube, <b>Deno</b> (about 40 MB) is downloaded the first time you use YouTube. SoundCloud does not need it.</li>
+        <li>For YouTube, <b>Deno</b> (about 90 MB, a JavaScript runtime YouTube's pages need) is downloaded the first time you download from YouTube, from its official GitHub releases. SoundCloud does not need it.</li>
         <li>They are kept up to date automatically (checked once a day), and you can remove them at any time.</li>
         <li>Only download music you have the right to use, and follow the sites' terms. Songs stay on this Deck.</li>
       </ul>
@@ -464,12 +520,16 @@ const JobBar: VFC<{ job: python.DownloadJob; onCancel: () => void }> = ({ job, o
   const label =
     job.state === "paused"
       ? "Paused while a game runs, continues afterwards"
-      : job.state === "failed"
-        ? `Failed: ${job.error}`
+      : job.state === "preparing"
+        ? "Setting up YouTube support (downloading Deno, about 90 MB, only this once)..."
+        : job.state === "failed"
+        ? job.blocked
+          ? "YouTube asked to confirm you're not a bot. Try again later."
+          : `Failed: ${job.error}`
         : job.state === "done"
           ? "Added to My Packs"
           : `Downloading ${Math.round(job.progress)}%`;
-  const active = job.state === "downloading" || job.state === "starting" || job.state === "paused";
+  const active = ["downloading", "starting", "paused", "preparing"].includes(job.state);
   return (
     // @ts-ignore
     <Focusable flow-children="row" style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "12px" }}>
@@ -501,10 +561,10 @@ const JobBar: VFC<{ job: python.DownloadJob; onCancel: () => void }> = ({ job, o
 
 const SITES = [
   { id: "soundcloud", label: "SoundCloud", ready: true },
-  { id: "youtube", label: "YouTube (next update)", ready: false },
+  { id: "youtube", label: "YouTube", ready: true },
 ];
 
-const SearchArea: VFC = () => {
+const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => {
   const [site, setSite] = useState("soundcloud");
   const [query, setQuery] = useState("");
   const [searched, setSearched] = useState("");
@@ -530,8 +590,11 @@ const SearchArea: VFC = () => {
     setPage(r.page);
     setHighestSeen((h) => Math.max(h, r.page));
     if (r.last_page) setLastPage(r.page);
-    if (r.error === "broken") setError("");
-    else if (r.error) setError(r.error);
+    // A broken site or a bot check has its own warning at the top of the page
+    if (r.error === "broken" || r.error === "blocked") {
+      setError("");
+      onStatusChange();
+    } else if (r.error) setError(r.error);
   };
 
   const newSearch = () => {
@@ -563,7 +626,8 @@ const SearchArea: VFC = () => {
         python.reloadBackend();
         if (searched) load(searched, page); // marks the track as added
       }
-      timer = setTimeout(tick, j && ["starting", "downloading", "paused"].includes(j.state) ? 500 : 3000);
+      if (j && j.state === "failed" && j.blocked) onStatusChange();
+      timer = setTimeout(tick, j && ["preparing", "starting", "downloading", "paused"].includes(j.state) ? 500 : 3000);
     };
     tick();
     return () => {
@@ -685,9 +749,12 @@ export const FindMusicPage: VFC = () => {
       {Object.entries(status.broken || {}).map(([site, info]) => (
         <BrokenWarning key={site} site={site} info={info} />
       ))}
+      {Object.entries(status.blocked || {}).map(([site, info]) => (
+        <BlockedWarning key={"b" + site} site={site} info={info} />
+      ))}
       {ready ? (
         <>
-          <SearchArea />
+          <SearchArea onStatusChange={() => python.toolsStatus().then((s) => s && setStatus(s))} />
           <div style={{ height: "24px" }} />
           <DownloaderPanel status={status} onStatus={setStatus} />
         </>

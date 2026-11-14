@@ -207,6 +207,8 @@ export interface ToolsStatus {
   setup: boolean;
   tools: Record<string, ToolInfo>;
   broken: Record<string, { since: number; error: string; version?: string }>;
+  /** Sites that asked to confirm "you're not a bot" (a temporary block of this network) */
+  blocked?: Record<string, { since: number; error: string }>;
   error?: string;
 }
 
@@ -286,7 +288,8 @@ export interface SearchPage {
   error?: string;
 }
 export interface DownloadJob {
-  state: "starting" | "downloading" | "paused" | "done" | "failed" | "cancelled";
+  state: "preparing" | "starting" | "downloading" | "paused" | "done" | "failed" | "cancelled";
+  blocked?: boolean;
   name: string;
   folder: string;
   site: string;

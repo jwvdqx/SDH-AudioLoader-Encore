@@ -45,8 +45,48 @@ NETWORK_MARKERS = ("Unable to connect to proxy", "Name or service not known", "T
                    "Network is unreachable", "timed out", "Connection refused")
 
 
+# YouTube sometimes asks to sign in "to confirm you're not a bot". That is a temporary block of the
+# network (too many requests), not a broken yt-dlp: no update helps, only waiting (or another "client").
+BOT_MARKERS = ("confirm you\u2019re not a bot", "confirm you're not a bot", "Sign in to confirm", "not a bot")
+
+
+def is_bot_check(stderr):
+    return any(m.lower() in (stderr or "").lower() for m in BOT_MARKERS)
+
+
+# The ways yt-dlp can talk to YouTube (it can pretend to be different YouTube apps). Usually only one or
+# two break at a time; the one that worked last is tried first.
+YOUTUBE_CLIENTS = ("default", "tv", "web_safari", "mweb")
+
+
+def site_args(tools, site, client=None):
+    """Extra yt-dlp options a site needs: for YouTube, Deno (its challenge scripts need a JavaScript
+    runtime) and the YouTube client to use."""
+    if site != "youtube":
+        return []
+    args = []
+    if tools.installed("deno"):
+        args += ["--js-runtimes", "deno:" + tools.path("deno")]
+    client = client or tools.pref("youtube_client", "default")
+    if client and client != "default":
+        args += ["--extractor-args", "youtube:player_client=" + client]
+    return args
+
+
+_YT_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
+def youtube_id(url):
+    """The video id of any YouTube link (watch?v=, youtu.be/, shorts/, embed/, music.youtube.com, &t=...)."""
+    url = (url or "").strip()
+    if _YT_ID.match(url):
+        return url
+    m = re.search(r"(?:v=|youtu\.be/|/shorts/|/embed/|/live/|/v/)([A-Za-z0-9_-]{11})", url)
+    return m.group(1) if m else ""
+
+
 def is_site_error(stderr):
-    if any(m in stderr for m in NETWORK_MARKERS):
+    if any(m in stderr for m in NETWORK_MARKERS) or is_bot_check(stderr):
         return False
     return any(m.lower() in stderr.lower() for m in SITE_ERROR_MARKERS)
 
@@ -150,10 +190,15 @@ def search(tools, site, query, page, packs_dir, timeout=120):
         return {"results": [], "page": page, "last_page": True}
     first = (page - 1) * PAGE_SIZE + 1
     last = page * PAGE_SIZE
-    args = ["--dump-json", "--skip-download", "--ignore-errors", "--no-warnings",
-            "--playlist-items", "{}-{}".format(first, last),
-            "{}{}:{}".format(SEARCH_PREFIX[site], MAX_PAGES * PAGE_SIZE, query)]
+    # YouTube's search list already has everything a card needs (and needs no JavaScript runtime);
+    # SoundCloud's tracks are looked up one by one to get their details
+    flat = ["--flat-playlist"] if site == "youtube" else []
+    args = flat + ["--dump-json", "--skip-download", "--ignore-errors", "--no-warnings",
+                   "--playlist-items", "{}-{}".format(first, last)] + site_args(tools, site) + [
+                   "{}{}:{}".format(SEARCH_PREFIX[site], MAX_PAGES * PAGE_SIZE, query)]
     result = tools.run_with_recovery(args, site, is_site_error, timeout=timeout)
+    if result.returncode != 0 and is_bot_check(result.stderr or ""):
+        tools.mark_blocked(site, (result.stderr or "").strip()[-300:])
     installed = installed_sources(packs_dir)
     results = []
     for line in (result.stdout or "").splitlines():
@@ -165,14 +210,19 @@ def search(tools, site, query, page, packs_dir, timeout=120):
         except ValueError:
             continue
         track_id = str(info.get("id") or "")
+        if site == "youtube":
+            track_id = youtube_id(track_id) or youtube_id(info.get("url", ""))
         if not track_id:
             continue
+        if site == "youtube" and not info.get("webpage_url"):
+            info["webpage_url"] = "https://www.youtube.com/watch?v=" + track_id
         duration = info.get("duration") or 0
         results.append({
             "site": site,
             "id": track_id,
             "url": info.get("webpage_url") or info.get("original_url") or "",
             "title": info.get("title") or "",
+            "views": info.get("view_count") or 0,
             "uploader": info.get("uploader") or info.get("channel") or "",
             "duration": duration,
             "thumbnail": best_thumbnail(info),
@@ -183,7 +233,10 @@ def search(tools, site, query, page, packs_dir, timeout=120):
         })
     out = {"results": results, "page": page, "last_page": page >= MAX_PAGES or len(results) < PAGE_SIZE}
     if not results and result.returncode != 0:
-        if tools.status()["broken"].get(site):
+        st = tools.status()
+        if st.get("blocked", {}).get(site):
+            out["error"] = "blocked"
+        elif st["broken"].get(site):
             out["error"] = "broken"
         else:
             lines = (result.stderr or "").strip().splitlines()
@@ -261,7 +314,7 @@ class Downloads:
 
     def start(self, site, track_id, url, details):
         with self.lock:
-            if self.job and self.job.get("state") in ("downloading", "paused", "starting"):
+            if self.job and self.job.get("state") in ("downloading", "paused", "starting", "preparing"):
                 return {"ok": False, "error": "Another song is still downloading."}
         if not url.startswith("https://"):
             return {"ok": False, "error": "This result has no link."}
@@ -279,9 +332,26 @@ class Downloads:
 
     def _work(self):
         job = self.status()
+        site = job["site"]
         folder = os.path.join(self.packs_dir, job["folder"])
-        args = ["-f", "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best", "--no-playlist", "--newline", "--continue",
-                "--no-warnings", "-o", os.path.join(folder, "audio.%(ext)s"), job["url"]]
+        base = ["-f", "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best", "--no-playlist", "--newline", "--continue",
+                "--no-warnings", "-o", os.path.join(folder, "audio.%(ext)s")]
+        # YouTube needs Deno: downloaded the first time YouTube is used
+        if site == "youtube":
+            try:
+                if not self.tools.installed("deno"):
+                    self._set(state="preparing")
+                self.tools.ensure("deno")
+            except Exception as e:
+                self._set(state="failed", error="Could not set up YouTube support (Deno): {}".format(e))
+                return self._cleanup(folder)
+        # YouTube "clients" to try, the one that worked last first
+        clients = [None]
+        if site == "youtube":
+            last = self.tools.pref("youtube_client", "default")
+            clients = [last] + [c for c in YOUTUBE_CLIENTS if c != last]
+        client_index = 0
+        bot_seen = False
         while True:
             if self.paused:
                 self._set(state="paused")
@@ -290,6 +360,8 @@ class Downloads:
                     if self.status() and self.status().get("state") == "cancelled":
                         return self._cleanup(folder)
             self._set(state="downloading")
+            client = clients[client_index]
+            args = base + site_args(self.tools, site, client) + [job["url"]]
             try:
                 self.tools.ensure("yt-dlp")
                 # Its own process group: pause and cancel stop yt-dlp and anything it started
@@ -317,15 +389,29 @@ class Downloads:
             if self.status().get("state") == "cancelled":
                 return self._cleanup(folder)
             if proc.returncode != 0:
+                bot = is_bot_check(stderr)
+                bot_seen = bot_seen or bot
+                # Another YouTube client often still works
+                if (bot or is_site_error(stderr)) and client_index + 1 < len(clients):
+                    client_index += 1
+                    continue
                 # The site may have changed: let the recovery find a working yt-dlp, then try once more
-                if is_site_error(stderr) and not self.status().get("retried"):
+                if not bot and is_site_error(stderr) and not self.status().get("retried"):
                     self._set(retried=True)
-                    check = self.tools.run_with_recovery(["--simulate", "--no-warnings", self.status()["url"]], self.status()["site"], is_site_error)
+                    check = self.tools.run_with_recovery(["--simulate", "--no-warnings"] + site_args(self.tools, site) + [job["url"]],
+                                                         site, is_site_error)
                     if check.returncode == 0:
+                        client_index = 0
                         continue
                     stderr = check.stderr or stderr
-                self._set(state="failed", error=(stderr.strip().splitlines() or ["download failed"])[-1][:300])
+                if bot_seen and not is_site_error(stderr):
+                    self.tools.mark_blocked(site, stderr.strip()[-300:])
+                    self._set(state="failed", error="blocked", blocked=True)
+                else:
+                    self._set(state="failed", error=(stderr.strip().splitlines() or ["download failed"])[-1][:300])
                 return self._cleanup(folder)
+            if site == "youtube" and client:
+                self.tools.set_pref("youtube_client", client)
             break
         audio = next((n for n in sorted(os.listdir(folder)) if n.startswith("audio.") and not n.endswith((".part", ".ytdl"))), None)
         if not audio:
@@ -364,7 +450,7 @@ class Downloads:
 
     def cancel(self):
         with self.lock:
-            if not self.job or self.job.get("state") not in ("downloading", "paused", "starting"):
+            if not self.job or self.job.get("state") not in ("downloading", "paused", "starting", "preparing"):
                 return self.status()
             self.job["state"] = "cancelled"
         self._stop_process()

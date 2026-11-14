@@ -151,10 +151,12 @@ class Tools:
                 data.setdefault("tools", {})
                 data.setdefault("broken", {})
                 data.setdefault("setup", False)
+                data.setdefault("blocked", {})
+                data.setdefault("prefs", {})
                 return data
         except Exception:
             pass
-        return {"tools": {}, "broken": {}, "setup": False}
+        return {"tools": {}, "broken": {}, "blocked": {}, "prefs": {}, "setup": False}
 
     def _save(self):
         tmp = self.state_path + ".tmp"
@@ -276,7 +278,7 @@ class Tools:
                 os.remove(full)
             except OSError:
                 pass
-        self.state = {"tools": {}, "broken": {}, "setup": False}
+        self.state = {"tools": {}, "broken": {}, "blocked": {}, "prefs": {}, "setup": False}
         self._save()
         return freed
 
@@ -320,6 +322,20 @@ class Tools:
         info["last_ok"] = self.now()
         if site:
             self.state["broken"].pop(site, None)
+            self.state["blocked"].pop(site, None)
+        self._save()
+
+    def mark_blocked(self, site, error):
+        """The site asks to confirm "you're not a bot": a temporary block of this network, not a broken yt-dlp."""
+        old = self.state["blocked"].get(site, {})
+        self.state["blocked"][site] = {"since": old.get("since", self.now()), "error": str(error)[:500]}
+        self._save()
+
+    def pref(self, key, default=None):
+        return self.state["prefs"].get(key, default)
+
+    def set_pref(self, key, value):
+        self.state["prefs"][key] = value
         self._save()
 
     def mark_broken(self, site, error):
@@ -335,7 +351,7 @@ class Tools:
             info["has_previous"] = os.path.isfile(self.previous_path(name))
             info["bytes"] = _size(self.path(name)) + _size(self.previous_path(name))
             out[name] = info
-        return {"setup": self.is_set_up(), "tools": out, "broken": self.state["broken"]}
+        return {"setup": self.is_set_up(), "tools": out, "broken": self.state["broken"], "blocked": self.state["blocked"]}
 
     def run_with_recovery(self, args, site, is_site_error, timeout=120):
         """Runs yt-dlp. When it fails because the site changed (is_site_error decides), tries, in order:
