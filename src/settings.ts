@@ -43,6 +43,8 @@ export interface Settings {
   hide_descriptions: boolean;
   /** Steam soundtrack tracks may be chosen by the random picks (daily, every replay, skip). */
   steam_music_in_rotation: boolean;
+  /** Media keys (Play, Stop, Next, Prev, also sent by Steam Input) control the menu music. */
+  media_keys: boolean;
   ui_tab: string;
   ui_collapsed: Record<string, boolean>;
 }
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   update_check: true,
   hide_descriptions: false,
   steam_music_in_rotation: false,
+  media_keys: true,
   ui_tab: "music",
   ui_collapsed: {},
 };
@@ -128,6 +131,7 @@ export function loadSettings(data: any): void {
   settings.update_check = d.update_check !== false;
   settings.hide_descriptions = d.hide_descriptions === true;
   settings.steam_music_in_rotation = d.steam_music_in_rotation === true;
+  settings.media_keys = d.media_keys !== false;
   settings.ui_tab = typeof d.ui_tab === "string" ? d.ui_tab : DEFAULT_SETTINGS.ui_tab;
   const collapsed: Record<string, boolean> = {};
   if (d.ui_collapsed && typeof d.ui_collapsed === "object") {

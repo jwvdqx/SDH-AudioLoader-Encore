@@ -21,6 +21,11 @@ Encore adds new options to the "legacy" menu music of Audio Loader (turn on **En
 **Music tab** (below Music Volume)
 - **Normalize Music Volume**: makes every music pack about equally loud. Loudness is measured the way the ear hears it (LUFS, the method streaming services use): deep bass counts less, and silence or quiet intros are left out, so they do not make a song look quieter than it is. Quiet music is boosted (up to +20 dB, even past the normal maximum volume) and loud music is turned down (up to -30 dB). A gentle leveler also evens out the loud parts inside a song and keeps boosted music from distorting. Each song is measured the first time it plays (a few seconds; the result is saved).
 
+**Controller buttons for the music (media keys)**
+- With **Media Keys Control the Music** on (Music tab > Playback, on by default), the keys **Next** (skip), **Prev** (the music before), **Play** (pause / resume) and **Stop** (pause) control the menu music.
+- To put them on controller buttons: Steam Settings > Controller > **Guide Button Chord Layout** > Edit (works everywhere in Steam, with Steam held), or any game's controller layout. Pick a button, then **Keyboard > Numpad**: Play, Stop, Next, Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
+- Nothing happens while a game is running (the music is paused then, and the keys belong to the game).
+
 **Steam Music tab**
 - Lists every track of the Steam soundtracks you own and have downloaded (in `steamapps/music`, on the internal drive and on SD cards or other library drives). Download a soundtrack in Steam, then press **Scan Again**. The list is also refreshed each time the plugin starts.
 - Tracks are grouped by soundtrack, with the cover, title, artist and track number. Pick a track to play it as menu music (Enable Legacy Features must be on). It then works with the other music options (Normalize Music Volume, Muffled Music, Now Playing, Smooth Fades...).
@@ -38,7 +43,13 @@ Settings from older versions: if the single **Normalize Volume** switch was on, 
 - **Muffled Music (Low-Pass Filter)**: seven separate toggles: **Steam Menu** (Steam button), **Quick Access Menu (...)**, **Game Loading** (from pressing play until the game has started and the music has stopped), **Pop-ups and Notifications** (while a pop-up such as a confirmation box is open, and for a few seconds when a notification comes in), **Skip Now Playing Notifications** (an extra switch: Encore's own Now Playing notification does not muffle the music, other notifications still do; it only matters when Pop-ups and Notifications is on), **Volume** (while the volume is being changed, and for 1.5 seconds after) and **Microphone** (for a moment, 1.5 seconds, each time the microphone is switched on or off or its volume changes; experimental, it reads Steam's audio devices twice a second). While one is active, the menu music is smoothly muffled; it opens up again a bit more slowly, so the change is not abrupt. A **Filter Strength** slider (0-100%) sets how muffled it is, and you hear the filter for a moment when you move it. Only Encore's menu music is filtered, not Steam's sound effects or the game.
 
 **Library tab**
-- **Favorites and blocked packs**: favorites come up 3 times as often, blocked packs are never picked automatically (you can still choose them by hand).
+- A summary of your packs, and shortcuts to **My Packs** and **Browse New Packs**.
+
+**My Packs** (first page of the Pack Manager)
+- Every installed pack as a card, in a **Music** and a **Sounds** section: picture (from the pack website when it has one), name, author, version, how often it played, and badges for **Playing**, **In use**, **Favorite** (★), **Never pick** and **Update**.
+- Quick buttons on each card: **Play now** (music) or **Use these sounds**, **Favorite** (comes up 3 times as often), **Never pick automatically** (you can still choose it by hand), **Update** (when a newer version exists), **Details**, and **Uninstall** (asks first). The selected button's name is shown on the card.
+- Filter (All, Music, Sounds), sort (name, most played, least played) and search by name or author. A **Steam Default Sounds** card switches back to Steam's own sounds.
+- This replaces the old Uninstall page, and the Favorites & Blocked dropdowns that were in the Library tab.
 - **Play stats**: the most and least played packs.
 
 **Info tab**

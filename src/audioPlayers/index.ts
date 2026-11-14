@@ -10,3 +10,4 @@ export * from "./fade";
 export * from "./limits";
 export * from "./stats";
 export * from "./steamMusic";
+export * from "./mediaKeys";

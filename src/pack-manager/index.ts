@@ -1,5 +1,5 @@
 export * from "./AboutPage";
-export * from "./UninstallPage";
+export * from "./MyPacksPage";
 export * from "./SettingsPage";
 export * from "./PackBrowserPage";
 export * from "./StarredPacksPage";

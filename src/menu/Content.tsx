@@ -58,6 +58,7 @@ import {
 import * as python from "../python";
 import { notifySettingsChanged, PlayMode, PLAY_MODES, updateSetting } from "../settings";
 import { useSettings } from "./useSettings";
+import { playMusicByHand } from "./actions";
 import { GlobalState, useGlobalState } from "../state/GlobalState";
 import { ACCENT, cardStyle, FocusButton, Group, Info, Note, PANEL_BORDER, Slider, smallText, showTextWindow, Toggle } from "./parts";
 import { checkUpdateOnce, forceUpdateCheck, getUpdateInfo, isNewer } from "./update";
@@ -538,6 +539,12 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
 
           <Group id="music-playback" title="Playback">
             <Toggle
+              label="Media Keys Control the Music"
+              description="Play, Stop, Next and Prev keys pause, skip, or go back to the music before. Bind them to controller buttons in Steam Input: in a controller layout (for example Settings > Controller > Guide Button Chord Layout for Steam + a button), pick a button, then Keyboard > Numpad > Play / Stop / Next / Prev."
+              checked={settings.media_keys}
+              onChange={(value) => updateSetting("media_keys", value)}
+            />
+            <Toggle
               label="Show Now Playing Notifications"
               description="Shows an Encore popup when a new music pack or Steam track starts. Turn this off to suppress only these Now Playing notifications; the Now Playing card and all other Steam/Decky notifications are unaffected."
               checked={showNowPlaying}
@@ -600,22 +607,13 @@ const dim = (on: boolean) => (on ? { opacity: 0.55, fontStyle: "italic" as const
 const SteamTab: VFC = () => {
   const g = useGlobalState();
   const settings = useSettings();
-  const { soundPacks, selectedMusic, legacyEnabled, menuMusic, gamesRunning, musicVolume, dailyRandomMusic, setGlobalState } = g;
+  const { soundPacks, selectedMusic, legacyEnabled } = g;
   const [scanning, setScanning] = useState(false);
   const albums = useMemo(() => steamAlbums(soundPacks), [soundPacks]);
   const trackCount = albums.reduce((n, a) => n + a.tracks.length, 0);
 
   const play = (name: string) => {
-    if (!legacyEnabled) return;
-    python.setConfig({ selected_music: name });
-    // Picked by hand: with "New Music Every Day" on, it becomes today's music
-    if (dailyRandomMusic) {
-      const today = getTodayKey();
-      setGlobalState("dailyMusicDate", today);
-      setGlobalState("dailyMusicPick", name);
-      python.setConfig({ daily_music_date: today, daily_music_pick: name });
-    }
-    changeMenuMusic(name, menuMusic, (k, v) => setGlobalState(k, v), gamesRunning, soundPacks, musicVolume);
+    if (legacyEnabled) playMusicByHand(g, name);
   };
 
   return (
@@ -901,78 +899,39 @@ const EffectsTab: VFC = () => {
   );
 };
 
+// Opens the Pack Manager on a page ("MyPacks", "BrowsePacks"...)
+const openPackManager = (setGlobalState: (k: string, v: any) => void, tab: string) => {
+  setGlobalState("currentTab", tab);
+  Router.CloseSideMenus();
+  Router.Navigate("/audiopack-manager");
+};
+
 const LibraryTab: VFC = () => {
-  const { soundPacks } = useGlobalState();
+  const { soundPacks, setGlobalState } = useGlobalState();
   const settings = useSettings();
-  const [picked, setPicked] = useState<string>("");
-  const musicNames = useMemo(
-    () => soundPacks.filter((p) => p.music && !p.steam).map((p) => p.name).sort((a, b) => a.localeCompare(b)),
-    [soundPacks]
-  );
-  const options = useMemo(() => musicNames.map((n, i) => ({ label: n, data: i })), [musicNames]);
-  const current = musicNames.includes(picked) ? picked : musicNames[0] ?? "";
-  const isFavorite = settings.favorite_music.includes(current);
-  const isBlocked = settings.blocked_music.includes(current);
-  const toggleIn = (list: string[], name: string, on: boolean) =>
-    on ? Array.from(new Set([...list, name])) : list.filter((n) => n !== name);
   const most = playStats(soundPacks, 5, "most");
   const least = playStats(soundPacks, 5, "least");
-  const names = (list: string[]) => {
-    const text = list.filter((n) => musicNames.includes(n)).join(", ");
-    return text === "" ? "none" : text.length > 140 ? text.slice(0, 137) + "..." : text;
-  };
+  const installed = soundPacks.filter((p) => !p.steam);
+  const music = installed.filter((p) => p.music).length;
 
   return (
     <PanelSection>
+      <Info>
+        {installed.length} pack{installed.length === 1 ? "" : "s"} installed: {music} music, {installed.length - music} sounds.
+        {" "}
+        {settings.favorite_music.length} favorite{settings.favorite_music.length === 1 ? "" : "s"}, {settings.blocked_music.length} never picked.
+      </Info>
       <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={() => {
-            Router.CloseSideMenus();
-            Router.Navigate("/audiopack-manager");
-          }}
-        >
-          Manage Packs
+        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "MyPacks")}>
+          My Packs
         </ButtonItem>
       </PanelSectionRow>
-
-      <Group id="library-favorites" title="Favorites & Blocked">
-        <Note>Favorites come up 3 times as often. Blocked packs are never picked automatically, but you can still choose them by hand.</Note>
-        {musicNames.length === 0 ? (
-          <Info>No music packs are installed.</Info>
-        ) : (
-          <>
-            <PanelSectionRow>
-              <DropdownItem
-                bottomSeparator="none"
-                menuLabel="Music Pack"
-                label="Music Pack"
-                rgOptions={options}
-                selectedOption={options.find((o) => o.label === current)?.data ?? 0}
-                onChange={(option) => setPicked(option.label as string)}
-              />
-            </PanelSectionRow>
-            <Toggle
-              label="Favorite"
-              checked={isFavorite}
-              onChange={(value) => {
-                updateSetting("favorite_music", toggleIn(settings.favorite_music, current, value));
-                if (value && isBlocked) updateSetting("blocked_music", toggleIn(settings.blocked_music, current, false));
-              }}
-            />
-            <Toggle
-              label="Never Pick Automatically"
-              checked={isBlocked}
-              onChange={(value) => {
-                updateSetting("blocked_music", toggleIn(settings.blocked_music, current, value));
-                if (value && isFavorite) updateSetting("favorite_music", toggleIn(settings.favorite_music, current, false));
-              }}
-            />
-            <Info>Favorites: {names(settings.favorite_music)}</Info>
-            <Info>Blocked: {names(settings.blocked_music)}</Info>
-          </>
-        )}
-      </Group>
+      <Note>All your packs as cards: play or use a pack, mark favorites, never pick, update, uninstall.</Note>
+      <PanelSectionRow>
+        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "BrowsePacks")}>
+          Browse New Packs
+        </ButtonItem>
+      </PanelSectionRow>
 
       <Group id="library-stats" title="Play Stats" defaultCollapsed>
         <Info>
