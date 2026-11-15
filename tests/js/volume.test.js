@@ -95,3 +95,23 @@ test("a silent file is reported as silent", () => {
   assert.equal(measureLoudness([new Float32Array(16000)], 16000).lufs, null);
   assert.equal(measureLoudness([], 16000).lufs, null);
 });
+
+const { fadeValue } = require("../../src/audioPlayers/fade.ts");
+
+test("fades start and end exactly where they should", () => {
+  assert.equal(fadeValue(0, 1, 0), 0);
+  assert.equal(fadeValue(0, 1, 1), 1);
+  assert.ok(Math.abs(fadeValue(1, 0, 1)) < 1e-12);
+  assert.equal(fadeValue(1, 0, 0), 1);
+  assert.equal(fadeValue(0, 1, 5), 1, "late timers never overshoot");
+});
+
+test("a crossfade keeps the total power even (equal-power curves)", () => {
+  for (let p = 0; p <= 1.0001; p += 0.1) {
+    const outgoing = fadeValue(1, 0, p);
+    const incoming = fadeValue(0, 1, p);
+    assert.ok(Math.abs(outgoing ** 2 + incoming ** 2 - 1) < 1e-9, `at ${p.toFixed(1)}`);
+  }
+  // the straight line it replaces dipped to half the power in the middle
+  assert.ok(Math.abs(0.5 ** 2 + 0.5 ** 2 - 0.5) < 1e-12);
+});

@@ -1,6 +1,7 @@
 import { GlobalState } from "../state/GlobalState";
 import * as python from "../python";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
+import { continuousOn, resumeFor, savePositionNow } from "./continuous";
 import { getTodayKey, markTimeOfDayPlayed, pickReplayMusic, pickTodaysMusic, timeOfDayDue, timeOfDayPack } from "./dailyMusic";
 import { endSleepTimerPause } from "./limits";
 import { invalidateQueue, takeQueued, takeSkip } from "./playQueue";
@@ -9,7 +10,7 @@ import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v1.9.4";
+export const BUILD_TAG = "v2.0.0";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -211,15 +212,18 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
     let musicToPlay = s.selectedMusic;
     // A new day after sleeping means a new pick for "New Music Every Day"
     let newDay = false;
+    // Continuous Playback: the same music carries on after waking (no new pick)
+    const continuing = continuousOn() && musicToPlay !== "None";
+    if (continuing && s.menuMusic) savePositionNow(s.menuMusic, musicToPlay);
     // Only once per part of the day (a wake-up does not play it again)
-    const timePick = reason === "wake" ? timeOfDayDue(s.soundPacks) : null;
+    const timePick = reason === "wake" && !continuing ? timeOfDayDue(s.soundPacks) : null;
     if (timePick) markTimeOfDayPlayed();
     if (timePick) {
       musicToPlay = timePick;
       setGlobalState("selectedMusic", timePick);
       python.setConfig({ selected_music: timePick });
       note(`Music after waking (time of day): ${timePick}`);
-    } else if (reason === "wake" && s.dailyRandomMusic) {
+    } else if (reason === "wake" && s.dailyRandomMusic && !continuing) {
       const choice = pickTodaysMusic(
         s.soundPacks,
         s.dailyMusicDate,
@@ -233,7 +237,7 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
     }
     // "New Music Every Replay": waking up counts as a replay (the first music of a new day
     // still comes from "New Music Every Day")
-    if (reason === "wake" && !timePick && s.replayRandomMusic && !newDay && musicToPlay !== "None") {
+    if (reason === "wake" && !continuing && !timePick && s.replayRandomMusic && !newDay && musicToPlay !== "None") {
       const pick = pickReplayMusic(s.soundPacks, musicToPlay);
       if (pick) {
         musicToPlay = pick;
@@ -254,9 +258,10 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
       return;
     }
 
-    // Step 1 (silent music only): if the player still exists, just press play and see if it moves
+    // Step 1: if the player still exists, just press play and see if it moves (silent music, and
+    // with Continuous Playback also after waking: the player still knows where it was)
     const old = s.menuMusic;
-    if (reason === "silent" && old && !old.error) {
+    if ((reason === "silent" || continuing) && old && !old.error && s.selectedMusic === musicToPlay) {
       const before = old.currentTime;
       try {
         await old.play();
@@ -290,7 +295,8 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
         setGlobalState,
         s.gamesRunning,
         s.soundPacks,
-        s.musicVolume
+        s.musicVolume,
+        continuing ? resumeFor(musicToPlay) : null
       );
 
       await wait(CHECK_MS);

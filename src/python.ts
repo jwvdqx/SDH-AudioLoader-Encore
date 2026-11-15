@@ -121,12 +121,6 @@ export async function getBackendVersion(): Promise<any> {
   return server!.callPluginMethod("get_loader_version", {});
 }
 
-export async function fetchPackDb(): Promise<any> {
-  return server!.fetchNoCors("https://api.deckthemes.com/themes/legacy/audio", {
-    method: "GET",
-  });
-}
-
 export function downloadThemeFromUrl(themeId: string): Promise<any> {
   const { apiUrl } = globalState!.getPublicState();
   return server!.callPluginMethod("download_theme_from_url", {
@@ -280,6 +274,7 @@ export interface FoundTrack {
   duration: number;
   thumbnail: string;
   long: boolean;
+  views?: number;
   preview_only: boolean;
   /** The pack folder when this track is already installed */
   installed: string;
@@ -295,6 +290,7 @@ export interface SearchPage {
   results: FoundTrack[];
   page: number;
   last_page: boolean;
+  max_pages?: number;
   error?: string;
 }
 export interface DownloadJob {
@@ -307,9 +303,9 @@ export interface DownloadJob {
   error: string;
 }
 
-export function findMusicSearch(site: string, query: string, page: number): Promise<SearchPage> {
+export function findMusicSearch(site: string, query: string, page: number, pageSize = 10): Promise<SearchPage> {
   return server!
-    .callPluginMethod<{ site: string; query: string; page: number }, SearchPage>("find_music_search", { site, query, page })
+    .callPluginMethod<any, SearchPage>("find_music_search", { site, query, page, page_size: pageSize })
     .then((r) => (r.success ? r.result : { results: [], page, last_page: true, error: String(r.result) }))
     .catch((e) => ({ results: [], page, last_page: true, error: String(e) }));
 }
@@ -333,4 +329,23 @@ export function findMusicControl(action: "pause" | "resume" | "cancel" | "clear"
     .callPluginMethod<{ action: string }, { job: DownloadJob | null }>("find_music_control", { action })
     .then((r) => (r.success ? r.result.job : null))
     .catch(() => null);
+}
+
+// ---- Continuous Playback (see audioPlayers/continuous.ts) ----
+
+export function savePosition(data: { music: string; file: string; time: number; at: number }): Promise<any> {
+  return Promise.resolve(server?.callPluginMethod("save_position", { data })).catch(() => null);
+}
+
+export function loadPosition(): Promise<any> {
+  return Promise.resolve(server?.callPluginMethod<{}, any>("load_position", {}))
+    .then((r: any) => (r && r.success ? r.result : null))
+    .catch(() => null);
+}
+
+export function findMusicStream(site: string, url: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  return server!
+    .callPluginMethod<{ site: string; url: string }, any>("find_music_stream", { site, url })
+    .then((r) => (r.success ? r.result : { ok: false, error: String(r.result) }))
+    .catch((e) => ({ ok: false, error: String(e) }));
 }

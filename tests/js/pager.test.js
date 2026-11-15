@@ -42,3 +42,26 @@ test("the easter egg is only on the last page, going forward, on its own number"
   assert.equal(p.showsEasterEgg(3, 3, 4, null, "forward"), false, "not the last page");
   assert.equal(p.showsEasterEgg(10, 10, 10, null, "forward"), true, "page 10 is always the last");
 });
+
+test("with 20 results a page there are 5 pages, so page 5 is the last one", () => {
+  assert.equal(p.pagesToShow(4, 4, null, 5), 5);
+  assert.equal(p.showsEasterEgg(5, 5, 5, null, "forward", 5), true);
+  assert.equal(p.showsEasterEgg(5, 5, 6, null, "forward", 10), false);
+});
+
+const fo = require("../../src/pack-manager/findOptions.ts");
+const tr = (id, duration, extra = {}) => ({ site: "soundcloud", id, url: "", title: "T" + id, uploader: "U" + id, duration, thumbnail: "", long: false, preview_only: false, installed: "", fill: {}, ...extra });
+
+test("Find Music: sorting by length puts unknown lengths last", () => {
+  const list = [tr("a", 300), tr("b", 0), tr("c", 120)];
+  assert.deepEqual(fo.arrange(list, "shortest", "any", "all").map((t) => t.id), ["c", "a", "b"]);
+  assert.deepEqual(fo.arrange(list, "longest", "any", "all").map((t) => t.id), ["a", "c", "b"]);
+});
+
+test("Find Music: the length and show filters", () => {
+  const list = [tr("a", 200), tr("b", 400), tr("c", 900, { installed: "X" }), tr("d", 100, { preview_only: true })];
+  assert.deepEqual(fo.arrange(list, "relevance", "short", "all").map((t) => t.id), ["a", "d"]);
+  assert.deepEqual(fo.arrange(list, "relevance", "medium", "all").map((t) => t.id), ["b"]);
+  assert.deepEqual(fo.arrange(list, "relevance", "any", "new").map((t) => t.id), ["a", "b", "d"]);
+  assert.deepEqual(fo.arrange(list, "relevance", "any", "downloadable").map((t) => t.id), ["a", "b"]);
+});

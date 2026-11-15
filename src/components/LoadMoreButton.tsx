@@ -1,4 +1,5 @@
-import { DialogButton } from "decky-frontend-lib";
+import { FocusButton } from "../menu/parts";
+import { smallButton } from "./look";
 import { useState, Dispatch, SetStateAction, useEffect } from "react";
 import { ThemeQueryRequest, ThemeQueryResponse } from "../apiTypes";
 import { generateParamStr } from "../logic";
@@ -57,9 +58,9 @@ export function LoadMoreButton({
     <>
       {themeArr.items.length < themeArr.total ? (
         <>
-          <DialogButton onClick={loadMore} disabled={loading}>
-            Load More
-          </DialogButton>
+          <FocusButton style={{ ...smallButton(), width: "100%", height: "40px" }} disabled={loading} onClick={loadMore}>
+            {loading ? "Loading..." : `Load More (${themeArr.items.length} of ${themeArr.total})`}
+          </FocusButton>
         </>
       ) : null}
     </>

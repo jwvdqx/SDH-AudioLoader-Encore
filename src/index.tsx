@@ -36,6 +36,11 @@ import {
   stopMusicLowPassAudio,
   startMusicLowPassContextMonitor,
   startMediaKeys,
+  continuousOn,
+  loadPosition,
+  resumeFor,
+  savePositionNow,
+  startPositionTracker,
   configureMusicLowPass,
   timeOfDayDue,
   markTimeOfDayPlayed,
@@ -221,7 +226,8 @@ export default definePlugin((serverApi: ServerAPI) => {
     ensureEffectGain(activePack);
   });
 
-  python.getAndSetSoundPacks().then(() => {
+  // Continuous Playback needs the remembered place before the music starts
+  python.getAndSetSoundPacks().then(() => loadPosition().catch(() => null)).then((remembered) => {
     python.resolve(python.getConfig(), (data: any) => {
       // This sets the config data in globalState
       const configSelectedMusic = data?.selected_music || "None";
@@ -293,15 +299,25 @@ export default definePlugin((serverApi: ServerAPI) => {
       // With "New Music Every Day" on, today's music replaces the saved selection
       let musicToPlay = configSelectedMusic;
       let newDay = false;
+      // Continuous Playback goes first: the music that played when Steam closed, from where it was
+      const continuing =
+        configLegacyEnabled &&
+        settings.continuous_playback &&
+        !!remembered &&
+        soundPacks.some((p) => p.music && p.name === remembered.music);
+      if (continuing && remembered) {
+        musicToPlay = remembered.music;
+        setGlobalState("selectedMusic", musicToPlay);
+      }
       // "Music by Time of Day" decides first, when it has a choice for this part of the day
       // Only once per part of the day: coming back from Desktop Mode does not play it again
-      const timePick = configLegacyEnabled ? timeOfDayDue(soundPacks) : null;
+      const timePick = configLegacyEnabled && !continuing ? timeOfDayDue(soundPacks) : null;
       if (timePick) markTimeOfDayPlayed();
       if (timePick) {
         musicToPlay = timePick;
         setGlobalState("selectedMusic", timePick);
         python.setConfig({ selected_music: timePick });
-      } else if (configLegacyEnabled && configDailyRandom) {
+      } else if (configLegacyEnabled && configDailyRandom && !continuing) {
         const choice = pickTodaysMusic(
           soundPacks,
           configDailyDate,
@@ -316,7 +332,7 @@ export default definePlugin((serverApi: ServerAPI) => {
 
       // With "New Music Every Replay" on, starting up counts as a replay too (the first music of
       // a new day still comes from "New Music Every Day")
-      if (configLegacyEnabled && configReplay && !timePick && !newDay && musicToPlay !== "None") {
+      if (configLegacyEnabled && configReplay && !continuing && !timePick && !newDay && musicToPlay !== "None") {
         const pick = pickReplayMusic(soundPacks, musicToPlay);
         if (pick) {
           musicToPlay = pick;
@@ -329,7 +345,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       note(
         `Startup music: saved="${configSelectedMusic}", legacy=${configLegacyEnabled}, daily=${configDailyRandom}, ` +
           `newDay=${newDay}, everyReplay=${configReplay}, timeOfDay=${timePick ?? "-"}, packs=${soundPacks.length}, ` +
-          `history=${loadedHistoryCount}, chosen="${musicToPlay}"`
+          `history=${loadedHistoryCount}, continuing=${continuing ? Math.round(remembered?.time || 0) + "s" : "no"}, chosen="${musicToPlay}"`
       );
 
       // Plays menu music initially only if legacy settings are enabled
@@ -341,7 +357,8 @@ export default definePlugin((serverApi: ServerAPI) => {
             setGlobalState,
             [],
             soundPacks,
-            configMusicVolume
+            configMusicVolume,
+            continuing ? resumeFor(musicToPlay) : null
           );
         if (configWaitMovie && musicToPlay !== "None") {
           // "Wait for Startup Movie": start when the movie is over, unless something else
@@ -383,6 +400,8 @@ export default definePlugin((serverApi: ServerAPI) => {
           // Because gamesRunning is in globalState, array methods like push and splice don't work
           setGlobalState("gamesRunning", [...gamesRunning, update.unAppID]);
           if (menuMusic != null) {
+            // Continuous Playback: remember the place before the game
+            savePositionNow(menuMusic, selectedMusic);
             // Fades out when "Smooth Fades" is on
             pauseMusicSmooth(menuMusic);
           }
@@ -396,7 +415,8 @@ export default definePlugin((serverApi: ServerAPI) => {
             // A Sleep Timer pause ends when a game closes
             if (menuMusicControl.pausedByLimit === "sleepTimer") endSleepTimerPause(state);
             // With "New Music Every Replay" on, coming back from a game starts different music
-            if (playRandomMusic(state)) {
+            // (not with Continuous Playback: then the same music carries on)
+            if (!continuousOn() && playRandomMusic(state)) {
               // new music started
             } else if (menuMusic !== null && menuMusicControl.pausedByLimit === null) {
               Promise.resolve(resumeMusicSmooth(menuMusic)).catch(() => {});
@@ -414,6 +434,8 @@ export default definePlugin((serverApi: ServerAPI) => {
   const stopMediaKeys = startMediaKeys(state);
   // Battery Saver, Sleep Timer and "Soft Start for New Audio Device"
   const stopMusicLimits = startMusicLimits(state);
+  // Continuous Playback: keeps the place of the music up to date
+  const stopPositionTracker = startPositionTracker(() => state.getPublicState());
 
   serverApi.routerHook.addRoute("/audiopack-manager", () => (
     <GlobalStateContextProvider globalStateClass={state}>
@@ -436,7 +458,13 @@ export default definePlugin((serverApi: ServerAPI) => {
     ),
     icon: <RiFolderMusicFill />,
     onDismount: () => {
-      // Changes still waiting to be saved
+      // Changes still waiting to be saved, and where the music is (Continuous Playback)
+      try {
+        const live = state.getPublicState();
+        savePositionNow(live.menuMusic, live.selectedMusic);
+      } catch {
+        // nothing to save
+      }
       void python.flushConfig();
       // Take Encore's pages out of Decky's router, so an updated Encore shows its new pages
       try {
@@ -461,6 +489,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       stopMediaKeys();
       stopMusicLowPassAudio();
       stopMusicLimits();
+      stopPositionTracker();
       stopFx();
     },
   };
