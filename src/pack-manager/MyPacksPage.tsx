@@ -1,6 +1,5 @@
 import {
   ConfirmModal,
-  DialogButton,
   Focusable,
   Router,
   showModal,
@@ -21,9 +20,9 @@ import {
 } from "react-icons/fa";
 import { genericGET } from "../api";
 import { MinimalCSSThemeInfo } from "../apiTypes";
-import { changeMenuMusic } from "../audioPlayers";
 import { Pack } from "../classes";
-import { playMusicByHand, useSoundPack } from "../menu/actions";
+import { playMusicByHand, stopMusic, useSoundPack } from "../menu/actions";
+import { FocusButton } from "../menu/parts";
 import { useSettings } from "../menu/useSettings";
 import * as python from "../python";
 import { updateSetting } from "../settings";
@@ -34,6 +33,16 @@ import { useGlobalState } from "../state";
 // Steam soundtrack tracks are not shown here (there can be hundreds): they have the Steam Music tab.
 
 type Filter = "all" | "music" | "sounds";
+// More filters, combined (all of the chosen ones must match)
+type Extra = "favorites" | "never" | "updates" | "downloaded" | "website" | "local";
+const EXTRA_LABELS: Record<Extra, string> = {
+  favorites: "★ Favorites",
+  never: "Never pick",
+  updates: "Updates",
+  downloaded: "From Find Music",
+  website: "From the pack website",
+  local: "Added by hand",
+};
 type Sort = "name" | "most" | "least";
 const SORT_LABELS: Record<Sort, string> = {
   name: "Name",
@@ -100,6 +109,7 @@ const chip = (color: string): CSSProperties => ({
   whiteSpace: "nowrap",
 });
 
+// Encore's own button (its own highlight, so it matches the card instead of Steam's white focus)
 const ActionButton: VFC<{
   label: string;
   onClick: () => void;
@@ -108,24 +118,28 @@ const ActionButton: VFC<{
   danger?: boolean;
   active?: boolean;
 }> = ({ label, onClick, onHint, children, danger, active }) => (
-  <DialogButton
-    // The name of the button is shown on the card while it is selected
-    aria-label={label}
+  <FocusButton
     onClick={onClick}
-    onGamepadFocus={() => onHint(label)}
-    onGamepadBlur={() => onHint("")}
-    {...({ onMouseEnter: () => onHint(label), onMouseLeave: () => onHint("") } as any)}
+    // The name of the button is shown on the card while it is selected
+    onFocusChange={(on) => onHint(on ? label : "")}
     style={{
       minWidth: 0,
       width: "auto",
       flex: "1 1 0",
-      padding: "6px 0",
+      height: "32px",
+      padding: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
       fontSize: "14px",
-      color: danger ? "#ff9b9b" : active ? ACCENT : undefined,
+      borderRadius: "6px",
+      border: "1px solid rgba(120, 100, 170, 0.3)",
+      background: active ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : "rgba(40, 32, 70, 0.75)",
+      color: danger ? "#ff9b9b" : active ? "#fff" : "#d9ccef",
     }}
   >
     {children}
-  </DialogButton>
+  </FocusButton>
 );
 
 const SITE_LABELS: Record<string, string> = { soundcloud: "SoundCloud", youtube: "YouTube" };
@@ -139,6 +153,8 @@ export const PackCard: VFC<{
   remote?: RemoteInfo;
   apiUrl: string;
   playing: boolean;
+  /** The music is the selected one but is not playing right now */
+  paused?: boolean;
   inUse: boolean;
   favorite: boolean;
   blocked: boolean;
@@ -210,12 +226,16 @@ export const PackCard: VFC<{
         <div
           style={{ position: "absolute", top: "6px", right: "6px", display: "flex", gap: "4px" }}
         >
-          {props.playing && <span style={chip("rgba(40, 150, 90, 0.95)")}>Playing</span>}
+          {props.playing && (
+            <span style={chip(props.paused ? "rgba(110, 110, 130, 0.95)" : "rgba(40, 150, 90, 0.95)")}>
+              {props.paused ? "Paused" : "Playing"}
+            </span>
+          )}
           {props.inUse && <span style={chip("rgba(40, 150, 90, 0.95)")}>In use</span>}
           {outdated && <span style={chip("rgba(35, 94, 207, 0.95)")}>Update</span>}
         </div>
       </div>
-      <div style={{ padding: "8px 10px 4px", minWidth: 0 }}>
+      <div style={{ padding: "8px 10px 4px", minWidth: 0, flex: 1 }}>
         <div
           style={{
             fontWeight: 700,
@@ -315,25 +335,23 @@ export const PackCard: VFC<{
   );
 };
 
-const Segment: VFC<{ label: string; active: boolean; onClick: () => void }> = ({
-  label,
-  active,
-  onClick,
-}) => (
-  <DialogButton
+const Segment: VFC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+  <FocusButton
     onClick={onClick}
     style={{
       minWidth: 0,
       width: "auto",
-      padding: "6px 14px",
-      background: active
-        ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))"
-        : undefined,
-      color: active ? "#fff" : undefined,
+      height: "32px",
+      padding: "0 14px",
+      borderRadius: "16px",
+      fontSize: "13px",
+      border: active ? "1px solid rgba(200, 160, 255, 0.8)" : "1px solid rgba(120, 100, 170, 0.3)",
+      background: active ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : "rgba(40, 32, 70, 0.6)",
+      color: active ? "#fff" : "#a99bc4",
     }}
   >
     {label}
-  </DialogButton>
+  </FocusButton>
 );
 
 export const MyPacksPage: VFC = () => {
@@ -341,6 +359,7 @@ export const MyPacksPage: VFC = () => {
   const settings = useSettings();
   const { soundPacks, selectedMusic, activeSound, apiUrl, isInstalling } = g;
   const [filter, setFilter] = useState<Filter>("all");
+  const [extras, setExtras] = useState<Extra[]>([]);
   const [sort, setSort] = useState<Sort>("name");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
@@ -350,11 +369,23 @@ export const MyPacksPage: VFC = () => {
   const remote = useRemoteInfo(installed);
   const plays = (p: Pack) => settings.play_counts[p.name] || 0;
 
+  const matchesExtra = (p: Pack, x: Extra): boolean => {
+    const status = remote[p.id]?.status;
+    if (x === "favorites") return settings.favorite_music.includes(p.name);
+    if (x === "never") return settings.blocked_music.includes(p.name);
+    if (x === "updates") return status === "outdated";
+    if (x === "downloaded") return !!p.source;
+    if (x === "website") return !p.source && (status === "installed" || status === "outdated");
+    return !p.source && status === "local";
+  };
+  const extraCount = (x: Extra) => installed.filter((p) => matchesExtra(p, x)).length;
+
   const shown = useMemo(() => {
     const words = search.toLowerCase().split(/\s+/).filter(Boolean);
     const list = installed.filter(
       (p) =>
         (filter === "all" || (filter === "music") === p.music) &&
+        extras.every((x) => matchesExtra(p, x)) &&
         words.every((w) => `${p.name} ${p.author}`.toLowerCase().includes(w))
     );
     const byName = (a: Pack, b: Pack) => a.name.localeCompare(b.name);
@@ -362,7 +393,7 @@ export const MyPacksPage: VFC = () => {
     // Sound packs have no plays: they come after the music
     const n = (p: Pack) => (p.music ? plays(p) : sort === "most" ? -1 : Infinity);
     return list.sort((a, b) => (sort === "most" ? n(b) - n(a) : n(a) - n(b)) || byName(a, b));
-  }, [installed, filter, sort, search, settings.play_counts]);
+  }, [installed, filter, extras, sort, search, settings.play_counts, settings.favorite_music, settings.blocked_music, remote]);
 
   const toggleIn = (list: string[], name: string, on: boolean) =>
     on ? Array.from(new Set([...list, name])) : list.filter((n) => n !== name);
@@ -378,17 +409,7 @@ export const MyPacksPage: VFC = () => {
         onOK={() => {
           setBusy(true);
           // Do not leave a deleted pack playing or in use
-          if (p.music && p.name === selectedMusic) {
-            changeMenuMusic(
-              "None",
-              g.menuMusic,
-              (k: string, v: any) => g.setGlobalState(k, v),
-              g.gamesRunning,
-              soundPacks,
-              g.musicVolume
-            );
-            python.setConfig({ selected_music: "None" });
-          }
+          if (p.music && p.name === python.liveState().selectedMusic) stopMusic();
           if (!p.music && p.name === activeSound) useSoundPack(g, DEFAULT_SOUNDS);
           python.resolve(python.deletePack(p.name), () => {
             python.reloadBackend().finally(() => setBusy(false));
@@ -451,6 +472,7 @@ export const MyPacksPage: VFC = () => {
         remote={p ? remote[p.id] : undefined}
         apiUrl={apiUrl}
         playing={!!p?.music && p.name === selectedMusic}
+        paused={!g.menuMusic || g.menuMusic.paused}
         inUse={!p?.music && activeSound === name}
         favorite={!!p && settings.favorite_music.includes(p.name)}
         blocked={!!p && settings.blocked_music.includes(p.name)}
@@ -475,7 +497,7 @@ export const MyPacksPage: VFC = () => {
     );
   };
 
-  const showDefaultCard = filter !== "music" && search.trim() === "";
+  const showDefaultCard = filter !== "music" && search.trim() === "" && extras.length === 0;
 
   const section = (title: string, list: Pack[], visible: boolean, withDefault: boolean) => {
     if (!visible || (list.length === 0 && !withDefault)) return null;
@@ -543,6 +565,19 @@ export const MyPacksPage: VFC = () => {
             onChange={(e: any) => setSearch(e.target.value)}
           />
         </div>
+      </Focusable>
+      {/* @ts-ignore */}
+      <Focusable flow-children="row" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", marginBottom: "10px" }}>
+        <span style={{ fontSize: "12px", opacity: 0.7, marginRight: "4px" }}>Show only:</span>
+        {(Object.keys(EXTRA_LABELS) as Extra[]).map((x) => (
+          <Segment
+            key={x}
+            label={`${EXTRA_LABELS[x]} (${extraCount(x)})`}
+            active={extras.includes(x)}
+            onClick={() => setExtras(extras.includes(x) ? extras.filter((e) => e !== x) : [...extras, x])}
+          />
+        ))}
+        {extras.length > 0 && <Segment label="Clear" active={false} onClick={() => setExtras([])} />}
       </Focusable>
       <div style={{ fontSize: "12px", opacity: 0.7, marginBottom: "10px" }}>
         {busy || isInstalling ? "Working..." : ""}

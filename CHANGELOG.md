@@ -2,6 +2,26 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 1.9.4
+
+### Fixed
+- **Music played on top of other music.** Playing a pack from My Packs (or the Steam Music tab, the Music Pack
+  dropdown, or uninstalling the pack that plays) used the page's copy of "what is playing" from its last
+  redraw. When that copy was old, the music that was really playing was not stopped. Every action that
+  changes the music now looks at the live player. The play/pause button of the Now Playing card too.
+- **My Packs shows Playing or Paused** for the selected music, instead of always "Playing".
+
+### Changed
+- **Buttons in My Packs** use Encore's own highlight (Steam's white focus did not fit the cards) and line
+  up at the bottom of every card. The filter buttons are round chips in the same style.
+- **Library button** with an icon in the **Music** and **Sounds** tabs (replaces "Find New Music"). It opens
+  My Packs; Find Music and Browse are the next tabs there. The Library tab's three buttons (My Packs, Find
+  Music, Browse New Packs) have the same look, with icons and a line of text each.
+
+### Added
+- **More filters in My Packs** ("Show only", they can be combined): Favorites, Never pick, Updates, From Find
+  Music, From the pack website, Added by hand, each with its count, and Clear.
+
 ## 1.9.3
 
 ### Fixed
