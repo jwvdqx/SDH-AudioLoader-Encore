@@ -1,8 +1,9 @@
 import { ConfirmModal, DialogButton, Focusable, ModalRoot, showModal, TextField, ToggleField } from "decky-frontend-lib";
-import { CSSProperties, useEffect, useRef, useState, VFC } from "react";
+import { useEffect, useRef, useState, VFC } from "react";
 import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaPlay, FaSearch, FaStop, FaTimes } from "react-icons/fa";
 import { Dropdown } from "decky-frontend-lib";
 import { FocusButton } from "../menu/parts";
+import { chip, smallButton } from "../components/look";
 import { menuMusicControl, pauseMusicSmooth, resumeMusicSmooth } from "../audioPlayers";
 import { Pack } from "../classes";
 import { PackCard } from "./MyPacksPage";
@@ -269,20 +270,7 @@ const SetupCard: VFC<{ onDone: (s: python.ToolsStatus) => void }> = ({ onDone })
 
 // ---- the result cards
 
-const chip = (bg: string): CSSProperties => ({
-  fontSize: "10px",
-  fontWeight: 700,
-  letterSpacing: "0.4px",
-  textTransform: "uppercase",
-  padding: "2px 6px",
-  borderRadius: "4px",
-  background: bg,
-  color: "#fff",
-  whiteSpace: "nowrap",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "4px",
-});
+
 
 export const formatDuration = (s: number) => {
   if (!(s > 0)) return "";
@@ -293,21 +281,7 @@ export const formatDuration = (s: number) => {
   return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
 };
 
-const cardButton = (active = false): CSSProperties => ({
-  minWidth: 0,
-  width: "auto",
-  height: "32px",
-  padding: "0 8px",
-  fontSize: "12px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "6px",
-  borderRadius: "6px",
-  border: "1px solid rgba(120, 100, 170, 0.3)",
-  background: active ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : "rgba(40, 32, 70, 0.75)",
-  color: active ? "#fff" : "#d9ccef",
-});
+
 
 const ResultCard: VFC<{
   track: python.FoundTrack;
@@ -367,11 +341,11 @@ const ResultCard: VFC<{
       </div>
       {/* @ts-ignore */}
       <Focusable flow-children="row" style={{ display: "flex", gap: "4px", padding: "4px 8px 8px" }}>
-        <FocusButton style={{ ...cardButton(previewState !== ""), flex: "0 0 auto", width: "72px" }} onClick={onPreview}>
+        <FocusButton style={{ ...smallButton(previewState !== ""), flex: "0 0 auto", width: "72px" }} onClick={onPreview}>
           {previewState === "playing" ? <FaStop /> : <FaPlay />}
           {previewState === "loading" ? "..." : previewState === "playing" ? "Stop" : "Listen"}
         </FocusButton>
-        <FocusButton style={{ ...cardButton(), flex: 1 }} disabled={blocked} onClick={onDownload}>
+        <FocusButton style={{ ...smallButton(), flex: 1 }} disabled={blocked} onClick={onDownload}>
           {track.installed ? "Already added" : track.preview_only ? "Preview only (Go+)" : (
             <>
               <FaDownload />

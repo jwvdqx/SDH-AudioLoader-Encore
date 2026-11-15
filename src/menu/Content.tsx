@@ -64,7 +64,7 @@ import { notifySettingsChanged, PlayMode, PLAY_MODES, updateSetting } from "../s
 import { useSettings } from "./useSettings";
 import { playMusicByHand } from "./actions";
 import { GlobalState, useGlobalState } from "../state/GlobalState";
-import { ACCENT, cardStyle, FocusButton, Group, Info, Note, PANEL_BORDER, Slider, smallText, showTextWindow, Toggle } from "./parts";
+import { ACCENT, cardStyle, Choice, FocusButton, Group, Info, Note, PANEL_BORDER, Slider, smallText, showTextWindow, Toggle } from "./parts";
 import { checkUpdateOnce, forceUpdateCheck, getUpdateInfo, isNewer } from "./update";
 
 type TabId = "music" | "steam" | "sounds" | "effects" | "library" | "info";
@@ -291,25 +291,24 @@ const PowerGroup: VFC<{ state: GlobalState }> = ({ state }) => {
   const stoppedByTimer = menuMusicControl.pausedByLimit === "sleepTimer";
   return (
     <Group id="music-power" title="Battery & Sleep Timer" defaultCollapsed>
-      <Toggle
+      <Choice
         label="Battery Saver"
-        description="Pauses the music when the battery is low and the charger is not connected. It comes back when you charge or the battery recovers."
-        checked={settings.battery_saver}
-        onChange={(value) => {
-          updateSetting("battery_saver", value);
-          python.logEvent(`Battery Saver ${value ? "on" : "off"}`);
+        description="Pauses the music when the battery is below this level and the charger is not connected. It comes back when you charge or the battery recovers."
+        value={settings.battery_saver ? settings.battery_threshold : 0}
+        options={[
+          { data: 0, label: "Off" },
+          ...[10, 15, 20, 30, 50].map((n) => ({ data: n, label: `Below ${n}%` })),
+          ...(settings.battery_saver && ![10, 15, 20, 30, 50].includes(settings.battery_threshold)
+            ? [{ data: settings.battery_threshold, label: `Below ${settings.battery_threshold}%` }]
+            : []),
+        ]}
+        onChange={(v) => {
+          const on = Number(v) > 0;
+          updateSetting("battery_saver", on);
+          if (on) updateSetting("battery_threshold", Number(v));
+          python.logEvent(on ? `Battery Saver: below ${v}%` : "Battery Saver off");
         }}
       />
-      {settings.battery_saver && (
-        <Slider
-          label={`Pause below ${settings.battery_threshold}%`}
-          value={settings.battery_threshold}
-          min={5}
-          max={50}
-          step={5}
-          onChange={(value) => updateSetting("battery_threshold", value)}
-        />
-      )}
       <Slider
         label={`Sleep Timer: ${settings.sleep_timer_minutes} min`}
         description="Stops the music after this time. It comes back when the Deck wakes up, a game closes, or you press Resume."
@@ -592,17 +591,20 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
               checked={settings.smooth_fades}
               onChange={(value) => updateSetting("smooth_fades", value)}
             />
-            <Toggle
-              label="Lower Music for Notifications"
-              description="Briefly lowers the music when Steam plays a notification, message or achievement sound."
-              checked={settings.duck_notifications}
-              onChange={(value) => updateSetting("duck_notifications", value)}
-            />
-            <Toggle
-              label="Soft Start for New Audio Device"
-              description="When you connect headphones or a Bluetooth speaker, the music is lowered for a moment so it does not surprise you."
-              checked={settings.soft_new_device}
-              onChange={(value) => updateSetting("soft_new_device", value)}
+            <Choice
+              label="Lower the Music For"
+              description="Briefly lowers the music when Steam plays a notification, message or achievement sound, and/or for a moment when you connect headphones or a Bluetooth speaker (so it does not surprise you)."
+              value={settings.duck_notifications && settings.soft_new_device ? "both" : settings.duck_notifications ? "notifications" : settings.soft_new_device ? "device" : "off"}
+              options={[
+                { data: "off", label: "Nothing" },
+                { data: "notifications", label: "Notifications" },
+                { data: "device", label: "New audio device" },
+                { data: "both", label: "Both" },
+              ]}
+              onChange={(v) => {
+                updateSetting("duck_notifications", v === "notifications" || v === "both");
+                updateSetting("soft_new_device", v === "device" || v === "both");
+              }}
             />
           </Group>
 
@@ -842,24 +844,23 @@ const EffectsTab: VFC = () => {
       {!legacyEnabled && <Info>Turn on Legacy Features (Music tab) to use these.</Info>}
       <Group id="effects-lowpass" title="Muffled Music (Low-Pass Filter)">
         <Note>Muffles the menu music while one of these is active. Sounds and games are not changed.</Note>
-        <Toggle
-          label="Steam Menu"
-          description="While the Steam menu (Steam button) is open."
-          checked={lowPassSteamMenu}
-          onChange={(value) => {
-            setGlobalState("lowPassSteamMenu", value);
-            apply({ steamMenu: value });
-            python.setConfig({ low_pass_steam_menu: value });
-          }}
-        />
-        <Toggle
-          label="Quick Access Menu (...)"
-          description="While the Quick Access (...) menu is open."
-          checked={lowPassQuickAccess}
-          onChange={(value) => {
-            setGlobalState("lowPassQuickAccess", value);
-            apply({ quickAccess: value });
-            python.setConfig({ low_pass_quick_access: value });
+        <Choice
+          label="Menus"
+          description="While the Steam menu (Steam button) or the Quick Access (...) menu is open."
+          value={lowPassSteamMenu && lowPassQuickAccess ? "both" : lowPassSteamMenu ? "steam" : lowPassQuickAccess ? "qam" : "off"}
+          options={[
+            { data: "off", label: "Off" },
+            { data: "steam", label: "Steam menu" },
+            { data: "qam", label: "Quick Access (...)" },
+            { data: "both", label: "Both menus" },
+          ]}
+          onChange={(v) => {
+            const steamMenu = v === "steam" || v === "both";
+            const quickAccess = v === "qam" || v === "both";
+            setGlobalState("lowPassSteamMenu", steamMenu);
+            setGlobalState("lowPassQuickAccess", quickAccess);
+            apply({ steamMenu, quickAccess });
+            python.setConfig({ low_pass_steam_menu: steamMenu, low_pass_quick_access: quickAccess });
           }}
         />
         <Toggle
@@ -872,40 +873,40 @@ const EffectsTab: VFC = () => {
             python.setConfig({ low_pass_game_loading: value });
           }}
         />
-        <Toggle
+        <Choice
           label="Pop-ups and Notifications"
           description="While a pop-up is open (like a confirmation box), and for a few seconds when a notification comes in."
-          checked={lowPassPopups}
-          onChange={(value) => {
-            setGlobalState("lowPassPopups", value);
-            apply({ popups: value });
-            python.setConfig({ low_pass_popups: value });
+          value={!lowPassPopups ? "off" : settings.lowpass_skip_now_playing ? "not_now_playing" : "all"}
+          options={[
+            { data: "off", label: "Off" },
+            { data: "all", label: "All" },
+            { data: "not_now_playing", label: "All but Now Playing" },
+          ]}
+          onChange={(v) => {
+            const on = v !== "off";
+            setGlobalState("lowPassPopups", on);
+            apply({ popups: on });
+            python.setConfig({ low_pass_popups: on });
+            if (on) updateSetting("lowpass_skip_now_playing", v === "not_now_playing");
           }}
         />
-        <Toggle
-          label="Skip Now Playing Notifications"
-          description="Encore's own Now Playing notification does not muffle the music. Only has an effect when Pop-ups and Notifications is on."
-          checked={settings.lowpass_skip_now_playing}
-          onChange={(value) => updateSetting("lowpass_skip_now_playing", value)}
-        />
-        <Toggle
-          label="Volume"
-          description="While you change the volume (volume buttons or slider), and for a moment after."
-          checked={lowPassVolume}
-          onChange={(value) => {
-            setGlobalState("lowPassVolume", value);
-            apply({ volume: value });
-            python.setConfig({ low_pass_volume: value });
-          }}
-        />
-        <Toggle
-          label="Microphone"
-          description="For a moment when the microphone is switched on or off, or its volume changes. Experimental: check Info > Show Debug Info if it does nothing."
-          checked={lowPassMicrophone}
-          onChange={(value) => {
-            setGlobalState("lowPassMicrophone", value);
-            apply({ microphone: value });
-            python.setConfig({ low_pass_microphone: value });
+        <Choice
+          label="Volume and Microphone"
+          description="For a moment while you change the volume, or when the microphone is switched on or off or its volume changes (the microphone part is experimental: check Info > Show Debug Info if it does nothing)."
+          value={lowPassVolume && lowPassMicrophone ? "both" : lowPassVolume ? "volume" : lowPassMicrophone ? "mic" : "off"}
+          options={[
+            { data: "off", label: "Off" },
+            { data: "volume", label: "Volume" },
+            { data: "mic", label: "Microphone" },
+            { data: "both", label: "Both" },
+          ]}
+          onChange={(v) => {
+            const volume = v === "volume" || v === "both";
+            const microphone = v === "mic" || v === "both";
+            setGlobalState("lowPassVolume", volume);
+            setGlobalState("lowPassMicrophone", microphone);
+            apply({ volume, microphone });
+            python.setConfig({ low_pass_volume: volume, low_pass_microphone: microphone });
           }}
         />
         <Slider

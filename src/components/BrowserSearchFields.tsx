@@ -1,12 +1,6 @@
-import {
-  DialogButton,
-  Dropdown,
-  DropdownOption,
-  Focusable,
-  gamepadDialogClasses,
-  PanelSectionRow,
-  TextField,
-} from "decky-frontend-lib";
+import { Dropdown, DropdownOption, Focusable, gamepadDialogClasses, TextField } from "decky-frontend-lib";
+import { FocusButton } from "../menu/parts";
+import { smallButton } from "./look";
 import { useEffect, useMemo, memo } from "react";
 import { TiRefreshOutline } from "react-icons/ti";
 import { ThemeQueryRequest } from "../apiTypes";
@@ -88,104 +82,59 @@ export function BrowserSearchFields({
     }
   }, []);
 
-  const repoOptions: never[] = [];
+  const set = (change: Partial<ThemeQueryRequest>) => {
+    setGlobalState(prevSearchOptsVarName, searchOpts);
+    setGlobalState(searchOptsVarName, { ...searchOpts, ...change });
+  };
+
+  // One row, in Encore's style: search, sort, filter and refresh
   return (
-    <>
-      <PanelSectionRow>
-        <Focusable style={{ display: "flex", maxWidth: "100%" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              maxWidth: repoOptions.length <= 1 ? "40%" : "33%",
-              minWidth: repoOptions.length <= 1 ? "40%" : "33%",
-            }}
-          >
-            <span>Sort</span>
-            <Dropdown
-              menuLabel="Sort"
-              rgOptions={formattedFilters.order}
-              strDefaultLabel="Last Updated (Newest)"
-              selectedOption={searchOpts.order}
-              onChange={(e) => {
-                setGlobalState(prevSearchOptsVarName, searchOpts);
-                setGlobalState(searchOptsVarName, {
-                  ...searchOpts,
-                  order: e.data,
-                });
-              }}
-            />
-          </div>
-          <div
-            className="CSSLoader_FilterDropDown_Container"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              maxWidth: repoOptions.length <= 1 ? "40%" : "33%",
-              minWidth: repoOptions.length <= 1 ? "40%" : "33%",
-              marginLeft: "auto",
-            }}
-          >
-            <span>Filter</span>
-            <Dropdown
-              menuLabel="Filter"
-              rgOptions={formattedFilters.filters}
-              strDefaultLabel="All"
-              selectedOption={searchOpts.filters}
-              onChange={(e) => {
-                setGlobalState(prevSearchOptsVarName, searchOpts);
-                setGlobalState(searchOptsVarName, {
-                  ...searchOpts,
-                  filters: e.data,
-                });
-              }}
-            />
-            <style>
-              {/* The CSS Selector god has done it again */}
-              {`
-                .CSSLoader_FilterDropDown_Container > button > div > div {
-                  width: 100%;
-                  display: flex;
-                  align-items: start;
-                }
-                .CSSLoader_FilterDropDown_Container > button > div > .${gamepadDialogClasses.Spacer} {
-                  width: 0;
-                }
-              `}
-            </style>
-          </div>
-        </Focusable>
-      </PanelSectionRow>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Focusable
-          style={{ display: "flex", alignItems: "center", width: "96%" }}
-        >
-          <div style={{ minWidth: "55%", marginRight: "auto" }}>
-            <TextField
-              label="Search"
-              value={searchOpts.search}
-              onChange={(e) => {
-                setGlobalState(prevSearchOptsVarName, searchOpts);
-                setGlobalState(searchOptsVarName, {
-                  ...searchOpts,
-                  search: e.target.value,
-                });
-              }}
-            />
-          </div>
-          <DialogButton
-            onClick={onReload}
-            style={{
-              maxWidth: "20%",
-              height: "50%",
-            }}
-          >
-            <TiRefreshOutline style={{ transform: "translate(0, 2px)" }} />
-            <span>Refresh</span>
-          </DialogButton>
-        </Focusable>
+    // @ts-ignore
+    <Focusable flow-children="row" style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", margin: "10px 0 14px" }}>
+      <div style={{ flex: "1 1 220px", minWidth: "200px" }}>
+        <TextField value={searchOpts.search} placeholder="Search packs" onChange={(e) => set({ search: e.target.value })} />
       </div>
-    </>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ fontSize: "12px", opacity: 0.7 }}>Sort</span>
+        <div style={{ minWidth: "190px" }}>
+          <Dropdown
+            menuLabel="Sort"
+            rgOptions={formattedFilters.order}
+            strDefaultLabel="Last Updated (Newest)"
+            selectedOption={searchOpts.order}
+            onChange={(e) => set({ order: e.data })}
+          />
+        </div>
+      </div>
+      <div className="CSSLoader_FilterDropDown_Container" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ fontSize: "12px", opacity: 0.7 }}>Type</span>
+        <div style={{ minWidth: "170px" }}>
+          <Dropdown
+            menuLabel="Type"
+            rgOptions={formattedFilters.filters}
+            strDefaultLabel="All"
+            selectedOption={searchOpts.filters}
+            onChange={(e) => set({ filters: e.data })}
+          />
+        </div>
+        <style>
+          {`
+            .CSSLoader_FilterDropDown_Container > div > button > div > div {
+              width: 100%;
+              display: flex;
+              align-items: start;
+            }
+            .CSSLoader_FilterDropDown_Container > div > button > div > .${gamepadDialogClasses.Spacer} {
+              width: 0;
+            }
+          `}
+        </style>
+      </div>
+      <FocusButton style={{ ...smallButton(), width: "auto" }} onClick={onReload}>
+        <TiRefreshOutline />
+        Refresh
+      </FocusButton>
+    </Focusable>
   );
 }
 

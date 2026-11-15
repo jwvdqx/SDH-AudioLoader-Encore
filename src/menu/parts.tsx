@@ -1,5 +1,6 @@
 import {
   ConfirmModal,
+  DropdownItem,
   DialogButton,
   Focusable,
   PanelSectionRow,
@@ -102,6 +103,29 @@ export const Toggle: VFC<{
         description={s.hide_descriptions ? undefined : description}
         checked={checked}
         onChange={onChange}
+      />
+    </PanelSectionRow>
+  );
+};
+
+/** A setting with a few choices: one dropdown instead of several switches. */
+export const Choice: VFC<{
+  label: string;
+  description?: string;
+  value: any;
+  options: { data: any; label: string }[];
+  onChange: (value: any) => void;
+}> = ({ label, description, value, options, onChange }) => {
+  const s = useSettings();
+  return (
+    <PanelSectionRow>
+      <DropdownItem
+        label={label}
+        description={s.hide_descriptions ? undefined : description}
+        menuLabel={label}
+        rgOptions={options}
+        selectedOption={value}
+        onChange={(o) => onChange(o.data)}
       />
     </PanelSectionRow>
   );

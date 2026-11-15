@@ -1,11 +1,12 @@
 import {
   ConfirmModal,
+  Dropdown,
   Focusable,
   Router,
   showModal,
   TextField,
 } from "decky-frontend-lib";
-import { CSSProperties, ReactNode, useEffect, useMemo, useState, VFC } from "react";
+import { ReactNode, useEffect, useMemo, useState, VFC } from "react";
 import {
   FaBan,
   FaCheck,
@@ -23,6 +24,7 @@ import { MinimalCSSThemeInfo } from "../apiTypes";
 import { Pack } from "../classes";
 import { playMusicByHand, stopMusic, useSoundPack } from "../menu/actions";
 import { FocusButton } from "../menu/parts";
+import { chip } from "../components/look";
 import { useSettings } from "../menu/useSettings";
 import * as python from "../python";
 import { updateSetting } from "../settings";
@@ -43,13 +45,15 @@ const EXTRA_LABELS: Record<Extra, string> = {
   website: "From the pack website",
   local: "Added by hand",
 };
-type Sort = "name" | "most" | "least";
-const SORT_LABELS: Record<Sort, string> = {
-  name: "Name",
-  most: "Most played",
-  least: "Least played",
-};
-const NEXT_SORT: Record<Sort, Sort> = { name: "most", most: "least", least: "name" };
+type Sort = "name" | "name_desc" | "author" | "most" | "least" | "recent";
+const SORT_OPTIONS: { data: Sort; label: string }[] = [
+  { data: "name", label: "Name A-Z" },
+  { data: "name_desc", label: "Name Z-A" },
+  { data: "author", label: "Author A-Z" },
+  { data: "most", label: "Most played" },
+  { data: "least", label: "Least played" },
+  { data: "recent", label: "Recently added (Find Music)" },
+];
 
 const ACCENT = "#c9a0ff";
 const DEFAULT_SOUNDS = "Default";
@@ -97,17 +101,7 @@ function useRemoteInfo(packs: Pack[]): Record<string, RemoteInfo> {
   return info;
 }
 
-const chip = (color: string): CSSProperties => ({
-  fontSize: "10px",
-  fontWeight: 700,
-  letterSpacing: "0.4px",
-  textTransform: "uppercase",
-  padding: "2px 6px",
-  borderRadius: "4px",
-  background: color,
-  color: "#fff",
-  whiteSpace: "nowrap",
-});
+
 
 // Encore's own button (its own highlight, so it matches the card instead of Steam's white focus)
 const ActionButton: VFC<{
@@ -335,23 +329,19 @@ export const PackCard: VFC<{
   );
 };
 
-const Segment: VFC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
-  <FocusButton
-    onClick={onClick}
-    style={{
-      minWidth: 0,
-      width: "auto",
-      height: "32px",
-      padding: "0 14px",
-      borderRadius: "16px",
-      fontSize: "13px",
-      border: active ? "1px solid rgba(200, 160, 255, 0.8)" : "1px solid rgba(120, 100, 170, 0.3)",
-      background: active ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : "rgba(40, 32, 70, 0.6)",
-      color: active ? "#fff" : "#a99bc4",
-    }}
-  >
-    {label}
-  </FocusButton>
+// A small label with a dropdown next to it (keeps the options on one line)
+const LabeledDropdown: VFC<{ label: string; value: any; options: { data: any; label: string }[]; onChange: (v: any) => void }> = ({
+  label,
+  value,
+  options,
+  onChange,
+}) => (
+  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+    <span style={{ fontSize: "12px", opacity: 0.7 }}>{label}</span>
+    <div style={{ minWidth: "150px" }}>
+      <Dropdown rgOptions={options} selectedOption={value} onChange={(o) => onChange(o.data)} />
+    </div>
+  </div>
 );
 
 export const MyPacksPage: VFC = () => {
@@ -359,7 +349,8 @@ export const MyPacksPage: VFC = () => {
   const settings = useSettings();
   const { soundPacks, selectedMusic, activeSound, apiUrl, isInstalling } = g;
   const [filter, setFilter] = useState<Filter>("all");
-  const [extras, setExtras] = useState<Extra[]>([]);
+  const [showOnly, setShowOnly] = useState<Extra | "all">("all");
+  const extras: Extra[] = showOnly === "all" ? [] : [showOnly];
   const [sort, setSort] = useState<Sort>("name");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
@@ -390,10 +381,16 @@ export const MyPacksPage: VFC = () => {
     );
     const byName = (a: Pack, b: Pack) => a.name.localeCompare(b.name);
     if (sort === "name") return list.sort(byName);
+    if (sort === "name_desc") return list.sort((a, b) => byName(b, a));
+    if (sort === "author") return list.sort((a, b) => (a.author || "").localeCompare(b.author || "") || byName(a, b));
+    if (sort === "recent") {
+      const added = (p: Pack) => Number((p.source as any)?.added) || 0;
+      return list.sort((a, b) => added(b) - added(a) || byName(a, b));
+    }
     // Sound packs have no plays: they come after the music
     const n = (p: Pack) => (p.music ? plays(p) : sort === "most" ? -1 : Infinity);
     return list.sort((a, b) => (sort === "most" ? n(b) - n(a) : n(a) - n(b)) || byName(a, b));
-  }, [installed, filter, extras, sort, search, settings.play_counts, settings.favorite_music, settings.blocked_music, remote]);
+  }, [installed, filter, showOnly, sort, search, settings.play_counts, settings.favorite_music, settings.blocked_music, remote]);
 
   const toggleIn = (list: string[], name: string, on: boolean) =>
     on ? Array.from(new Set([...list, name])) : list.filter((n) => n !== name);
@@ -538,46 +535,29 @@ export const MyPacksPage: VFC = () => {
           margin: "10px 0",
         }}
       >
-        <Segment
-          label={`All (${installed.length})`}
-          active={filter === "all"}
-          onClick={() => setFilter("all")}
-        />
-        <Segment
-          label={`Music (${musicCount})`}
-          active={filter === "music"}
-          onClick={() => setFilter("music")}
-        />
-        <Segment
-          label={`Sounds (${installed.length - musicCount})`}
-          active={filter === "sounds"}
-          onClick={() => setFilter("sounds")}
-        />
-        <Segment
-          label={`Sort: ${SORT_LABELS[sort]}`}
-          active={false}
-          onClick={() => setSort(NEXT_SORT[sort])}
-        />
-        <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
-          <TextField
-            value={search}
-            placeholder="Search name or author"
-            onChange={(e: any) => setSearch(e.target.value)}
-          />
+        <div style={{ flex: "1 1 220px", minWidth: "200px" }}>
+          <TextField value={search} placeholder="Search name or author" onChange={(e: any) => setSearch(e.target.value)} />
         </div>
-      </Focusable>
-      {/* @ts-ignore */}
-      <Focusable flow-children="row" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", marginBottom: "10px" }}>
-        <span style={{ fontSize: "12px", opacity: 0.7, marginRight: "4px" }}>Show only:</span>
-        {(Object.keys(EXTRA_LABELS) as Extra[]).map((x) => (
-          <Segment
-            key={x}
-            label={`${EXTRA_LABELS[x]} (${extraCount(x)})`}
-            active={extras.includes(x)}
-            onClick={() => setExtras(extras.includes(x) ? extras.filter((e) => e !== x) : [...extras, x])}
-          />
-        ))}
-        {extras.length > 0 && <Segment label="Clear" active={false} onClick={() => setExtras([])} />}
+        <LabeledDropdown
+          label="Type"
+          value={filter}
+          options={[
+            { data: "all", label: `All (${installed.length})` },
+            { data: "music", label: `Music (${musicCount})` },
+            { data: "sounds", label: `Sounds (${installed.length - musicCount})` },
+          ]}
+          onChange={(v) => setFilter(v)}
+        />
+        <LabeledDropdown
+          label="Show"
+          value={showOnly}
+          options={[
+            { data: "all", label: "Everything" },
+            ...(Object.keys(EXTRA_LABELS) as Extra[]).map((x) => ({ data: x, label: `${EXTRA_LABELS[x]} (${extraCount(x)})` })),
+          ]}
+          onChange={(v) => setShowOnly(v)}
+        />
+        <LabeledDropdown label="Sort" value={sort} options={SORT_OPTIONS} onChange={(v) => setSort(v)} />
       </Focusable>
       <div style={{ fontSize: "12px", opacity: 0.7, marginBottom: "10px" }}>
         {busy || isInstalling ? "Working..." : ""}

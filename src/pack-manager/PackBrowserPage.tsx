@@ -56,7 +56,7 @@ export const PackBrowserPage: FC = () => {
   }, [indexToSnapTo]);
 
   return (
-    <>
+    <div style={{ padding: "0 2.8vw 2em" }}>
       <BrowserSearchFields
         searchOpts={searchOpts}
         searchOptsVarName="themeSearchOpts"
@@ -73,9 +73,7 @@ export const PackBrowserPage: FC = () => {
         style={{
           display: "flex",
           flexWrap: "wrap",
-          justifyContent: "center",
-          rowGap: "5px",
-          columnGap: "5px",
+          gap: "12px",
         }}
       >
         {themeArr.items.map((e, i) => (
@@ -107,6 +105,6 @@ export const PackBrowserPage: FC = () => {
           />
         </div>
       </div>
-    </>
+    </div>
   );
 };

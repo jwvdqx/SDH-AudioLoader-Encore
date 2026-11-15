@@ -1,5 +1,8 @@
-import { ButtonItem, Navigation, PanelSectionRow } from "decky-frontend-lib";
-import { useEffect, useRef, useState, VFC } from "react";
+import { Focusable, Navigation } from "decky-frontend-lib";
+import { FaMusic, FaVolumeUp } from "react-icons/fa";
+import { FocusButton } from "../menu/parts";
+import { cardPicture, chip, CHIP, MUSIC_PLACEHOLDER_BG, smallButton, SOUNDS_PLACEHOLDER_BG } from "../components/look";
+import { useEffect, useState, VFC } from "react";
 import { ImSpinner5 } from "react-icons/im";
 import { BsStar, BsStarFill } from "react-icons/bs";
 import { FiDownload } from "react-icons/fi";
@@ -8,7 +11,6 @@ import * as python from "../python";
 import { genericGET, refreshToken, toggleStar as apiToggleStar } from "../api";
 
 import { useGlobalState } from "../state";
-import { calcButtonColor } from "../logic";
 import { FullCSSThemeInfo, PartialCSSThemeInfo } from "../apiTypes";
 import { Pack } from "../classes";
 
@@ -120,13 +122,6 @@ export const ExpandedViewPage: VFC = () => {
     return buttonText;
   }
 
-  const backButtonRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (backButtonRef?.current) {
-      backButtonRef.current.focus();
-    }
-  }, []);
-
   useEffect(() => {
     if (currentExpandedTheme?.id) {
       setLoaded(false);
@@ -186,261 +181,105 @@ export const ExpandedViewPage: VFC = () => {
   if (fullThemeData) {
     // This returns 'installed', 'outdated', or 'uninstalled'
     const installStatus = checkIfThemeInstalled(fullThemeData);
+    const music = fullThemeData.target === "Music";
+    const statusChip =
+      installStatus === "installed" ? (
+        <span style={chip(CHIP.good)}>Installed</span>
+      ) : installStatus === "outdated" ? (
+        <span style={chip(CHIP.update)}>Update available</span>
+      ) : null;
     return (
       // The outermost div is to push the content down into the visible area
-      <div
-        style={{
-          marginTop: "40px",
-        }}
-      >
+      <div style={{ marginTop: "40px", padding: "16px 2.8vw 2em" }}>
         <style>
           {`
-            @keyframes spin {
-              to {
-                transform: rotate(360deg);
-              }
-            }
-            .spinny {
-              animation: spin 1s linear infinite;
-            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .spinny { animation: spin 1s linear infinite; display: inline-flex; }
           `}
         </style>
+        <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
+          <div
+            style={{
+              ...cardPicture(imageUrl && !imageUrl.includes("Steam_Deck_logo") ? imageUrl : "", music ? MUSIC_PLACEHOLDER_BG : SOUNDS_PLACEHOLDER_BG),
+              width: "400px",
+              height: "225px",
+              borderRadius: "10px",
+              border: "1px solid rgba(190, 140, 255, 0.25)",
+              flex: "0 0 auto",
+            }}
+          >
+            {(!imageUrl || imageUrl.includes("Steam_Deck_logo")) && (
+              <span style={{ fontSize: "64px", opacity: 0.6 }}>{music ? <FaMusic /> : <FaVolumeUp />}</span>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              <span style={chip(music ? CHIP.music : CHIP.sounds)}>{fullThemeData.target}</span>
+              {statusChip}
+            </div>
+            <div style={{ fontWeight: 800, fontSize: "1.6em", lineHeight: 1.2, overflowWrap: "anywhere" }}>{fullThemeData.name}</div>
+            <div style={{ opacity: 0.8, marginTop: "2px" }}>
+              {fullThemeData.specifiedAuthor} · {fullThemeData.version}
+            </div>
+            <div style={{ display: "flex", gap: "14px", fontSize: "13px", opacity: 0.8, margin: "8px 0 14px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <BsStarFill style={{ color: "#ffd166" }} /> {fullThemeData.starCount}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <FiDownload /> {fullThemeData.download.downloadCount}
+              </span>
+            </div>
+            <Focusable style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "320px" }}>
+              <FocusButton
+                style={{ ...smallButton(installStatus !== "installed"), height: "40px", fontSize: "14px" }}
+                disabled={installStatus === "installed" || isInstalling}
+                onClick={() => installTheme()}
+              >
+                {isInstalling ? (
+                  <>
+                    <span className="spinny">
+                      <FiDownload />
+                    </span>
+                    Installing...
+                  </>
+                ) : (
+                  calcButtonText(installStatus)
+                )}
+              </FocusButton>
+              {!!apiFullToken && (
+                <FocusButton style={{ ...smallButton(isStarred), height: "40px" }} disabled={blurStarButton} onClick={toggleStar}>
+                  {isStarred ? <BsStarFill /> : <BsStar />}
+                  {isStarred ? "Starred" : "Star"} ({fullThemeData.starCount})
+                </FocusButton>
+              )}
+              <div>
+                <FocusButton
+                  style={{ ...smallButton(), height: "40px", width: "100%" }}
+                  onClick={() => {
+                    setGlobalState("currentExpandedTheme", undefined);
+                    setFullData(undefined);
+                    setLoaded(false);
+                    Navigation.NavigateBack();
+                  }}
+                >
+                  Back
+                </FocusButton>
+              </div>
+            </Focusable>
+          </div>
+        </div>
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            margin: "20px",
+            marginTop: "18px",
+            padding: "14px 16px",
+            borderRadius: "10px",
+            background: "linear-gradient(160deg, rgba(58, 30, 88, 0.55), rgba(20, 20, 44, 0.65))",
+            border: "1px solid rgba(190, 140, 255, 0.2)",
+            lineHeight: 1.55,
+            whiteSpace: "pre-wrap",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              marginBottom: "8px",
-              justifyContent: "space-between",
-            }}
-          >
-            <div
-              // I'm still using the format of div-with-a-bg-image, because I think that could make it a bit easier to add icons/text in front if we want
-              className="AudioLoader_PackBrowser_SingleItem_PreviewImageContainer"
-              style={{
-                width: "400px",
-                height: "320px",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  background:
-                    fullThemeData.target === "Music"
-                      ? "url(https://i.imgur.com/nISGpci.png)"
-                      : "linear-gradient(150deg, rgba(0, 0, 0, 0) 0%, rgba(118, 118, 118, 0) 0%, rgba(255, 255, 255, 0.2) 32%, rgba(255, 255, 255, 0.2) 35%, rgba(255, 255, 255, 0.2) 38%, rgba(210, 210, 210, 0) 70%, rgba(0, 0, 0, 0) 100%) 0% 0% / cover",
-                  position: "absolute",
-                  left: "0",
-                  width: "80%",
-                  height: "100%",
-                  backgroundSize: "cover",
-                  zIndex: 3,
-                  borderRadius: "2px",
-                }}
-              />
-              <div
-                style={{
-                  backgroundImage: `url(${imageUrl})`,
-                  backgroundColor: "#21323d",
-                  position: "absolute",
-                  left: "0",
-                  width: "80%",
-                  height: "100%",
-                  backgroundSize: "cover",
-                  zIndex: 2,
-                  borderRadius: "2px",
-                }}
-              />
-              <div
-                className={isInstalling ? "spinny" : ""}
-                style={{
-                  backgroundImage:
-                    fullThemeData.target === "Music"
-                      ? 'url("https://i.imgur.com/V9t3728.png")'
-                      : 'url("https://i.imgur.com/pWm35T0.png")',
-                  position: "absolute",
-                  top: "2.5%",
-                  right: "0",
-                  width: "75%",
-                  height: "95%",
-                  backgroundSize: "contain",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                width: "40%",
-                marginLeft: "16px",
-              }}
-            >
-              <div
-                style={{
-                  marginBottom: "8px",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <span
-                  style={{
-                    fontWeight: "bold",
-                    fontSize: "1.25em",
-                  }}
-                >
-                  {fullThemeData.name}
-                </span>
-                <span>{fullThemeData.specifiedAuthor}</span>
-                <span>{fullThemeData.target}</span>
-                <span>{fullThemeData.version}</span>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {!apiFullToken && (
-                    <>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          fontSize: "1em",
-                        }}
-                      >
-                        <BsStarFill />
-                        <span>{fullThemeData.starCount}</span>
-                      </div>
-                    </>
-                  )}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      fontSize: "1em",
-                    }}
-                  >
-                    <FiDownload />
-                    <span>{fullThemeData.download.downloadCount}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                {!!apiFullToken && (
-                  <>
-                    <PanelSectionRow>
-                      <div
-                        className="CssLoader_ThemeBrowser_ExpandedView_StarButton"
-                        style={{
-                          // This padding here overrides the default padding put on PanelSectionRow's by Valve
-                          // Before this, I was using negative margin to "shrink" the element, but this is a much better solution
-                          paddingTop: "0px",
-                          paddingBottom: "0px",
-                        }}
-                      >
-                        <ButtonItem
-                          layout="below"
-                          onClick={toggleStar}
-                          disabled={blurStarButton}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "0.25em",
-                            }}
-                          >
-                            {isStarred ? (
-                              <BsStarFill
-                                style={{ height: "1.25em", width: "1.25em" }}
-                              />
-                            ) : (
-                              <BsStar
-                                style={{ height: "1.25em", width: "1.25em" }}
-                              />
-                            )}{" "}
-                            <span>{fullThemeData.starCount}</span>
-                          </div>
-                        </ButtonItem>
-                      </div>
-                    </PanelSectionRow>
-                  </>
-                )}
-                <PanelSectionRow>
-                  <div
-                    className="CssLoader_ThemeBrowser_ExpandedView_InstallButtonColorFilter"
-                    style={{
-                      // This padding here overrides the default padding put on PanelSectionRow's by Valve
-                      // Before this, I was using negative margin to "shrink" the element, but this is a much better solution
-                      paddingTop: "0px",
-                      paddingBottom: "0px",
-                      // Filter is used to color the button blue for update
-                      filter: calcButtonColor(installStatus),
-                    }}
-                  >
-                    <ButtonItem
-                      layout="below"
-                      disabled={installStatus === "installed" || isInstalling}
-                      onClick={() => {
-                        installTheme();
-                      }}
-                    >
-                      <span className="CssLoader_ThemeBrowser_ExpandedView_InstallText">
-                        {calcButtonText(installStatus)}
-                      </span>
-                    </ButtonItem>
-                  </div>
-                </PanelSectionRow>
-                <PanelSectionRow>
-                  <div
-                    className="CssLoader_ThemeBrowser_ExpandedView_BackButtonContainer"
-                    style={{
-                      // This padding here overrides the default padding put on PanelSectionRow's by Valve
-                      paddingTop: "0px",
-                      paddingBottom: "0px",
-                    }}
-                  >
-                    <ButtonItem
-                      // They forgot to add the ref property to the buttons interface, so I'm just tsignoring the warning
-                      // @ts-ignore
-                      ref={backButtonRef}
-                      bottomSeparator="none"
-                      layout="below"
-                      onClick={() => {
-                        setGlobalState("currentExpandedTheme", undefined);
-                        setFullData(undefined);
-                        setLoaded(false);
-                        // Wow amazing navigation interface I wonder who coded it
-                        Navigation.NavigateBack();
-                      }}
-                    >
-                      <span className="CssLoader_ThemeBrowser_ExpandedView_BackText">
-                        Back
-                      </span>
-                    </ButtonItem>
-                  </div>
-                </PanelSectionRow>
-              </div>
-            </div>
-          </div>
-          <div
-            style={{
-              flex: "1 1 0%",
-              flexGrow: "1",
-            }}
-          >
-            <span>
-              {fullThemeData?.description || (
-                <i
-                  style={{
-                    color: "#666",
-                  }}
-                >
-                  No description provided.
-                </i>
-              )}
-            </span>
-          </div>
+          {fullThemeData?.description || <i style={{ opacity: 0.6 }}>No description provided.</i>}
         </div>
       </div>
     );
