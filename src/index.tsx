@@ -9,7 +9,6 @@ import {
 import { VFC } from "react";
 import { RiFolderMusicFill } from "react-icons/ri";
 import * as api from "./api";
-import { Permissions } from "./apiTypes";
 import {
   changeMenuMusic,
   effectVolumeFor,
@@ -48,8 +47,6 @@ import {
   ExpandedViewPage,
   PackBrowserPage,
   SettingsPage,
-  StarredPacksPage,
-  SubmissionsPage,
   MyPacksPage,
   FindMusicPage,
 } from "./pack-manager";
@@ -59,7 +56,7 @@ import { loadSettings, resolvePlayMode, settings } from "./settings";
 import { GlobalState, GlobalStateContextProvider, useGlobalState } from "./state/GlobalState";
 
 const PackManagerRouter: VFC = () => {
-  const { apiMeData, currentTab, setGlobalState } = useGlobalState();
+  const { currentTab, setGlobalState } = useGlobalState();
 
   return (
     <div
@@ -91,24 +88,6 @@ const PackManagerRouter: VFC = () => {
             content: <PackBrowserPage />,
             id: "BrowsePacks",
           },
-          ...(!!apiMeData
-            ? [
-                {
-                  title: "Starred Themes",
-                  content: <StarredPacksPage />,
-                  id: "StarredPacks",
-                },
-                ...(apiMeData.permissions.includes(Permissions.viewSubs)
-                  ? [
-                      {
-                        title: "Submissions",
-                        content: <SubmissionsPage />,
-                        id: "AudioSubmissions",
-                      },
-                    ]
-                  : []),
-              ]
-            : []),
           {
             title: "Settings",
             content: <SettingsPage />,
@@ -459,6 +438,13 @@ export default definePlugin((serverApi: ServerAPI) => {
     onDismount: () => {
       // Changes still waiting to be saved
       void python.flushConfig();
+      // Take Encore's pages out of Decky's router, so an updated Encore shows its new pages
+      try {
+        serverApi.routerHook.removeRoute("/audiopack-manager");
+        serverApi.routerHook.removeRoute("/pack-manager-expanded-view");
+      } catch {
+        // an older Decky: nothing to remove
+      }
       const { menuMusic, soundPatchInstance, volumePatchInstance } = state.getPublicState();
       const setGlobalState = state.setGlobalState.bind(state);
       if (menuMusic != null) {
