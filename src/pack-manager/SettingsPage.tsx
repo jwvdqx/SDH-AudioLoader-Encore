@@ -1,5 +1,6 @@
-import { DialogButton, Focusable, TextField } from "decky-frontend-lib";
+import { Focusable, TextField } from "decky-frontend-lib";
 import { useState, VFC } from "react";
+import { EncoreButton } from "../menu/parts";
 import { logInWithShortToken, logOut } from "../api";
 import { useGlobalState } from "../state";
 import { StoragePanel } from "./StoragePanel";
@@ -27,22 +28,22 @@ export const SettingsPage: VFC = () => {
         {apiFullToken ? (
           <>
             <div style={{ flex: 1 }}>{apiMeData ? `Logged in as ${apiMeData.username}` : "Loading..."}</div>
-            <DialogButton style={{ width: "auto", minWidth: "160px" }} onClick={logOut}>
+            <EncoreButton style={{ width: "auto", minWidth: "160px" }} onClick={logOut}>
               Unlink My Deck
-            </DialogButton>
+            </EncoreButton>
           </>
         ) : (
           <>
             <div style={{ flex: 1 }}>
               <TextField label="DeckThemes Account Key" bIsPassword value={token} onChange={(e) => setToken(e.target.value)} />
             </div>
-            <DialogButton
+            <EncoreButton
               style={{ width: "auto", minWidth: "160px" }}
               disabled={token.length !== 12}
               onClick={() => logInWithShortToken(token)}
             >
               Log In
-            </DialogButton>
+            </EncoreButton>
           </>
         )}
       </Focusable>

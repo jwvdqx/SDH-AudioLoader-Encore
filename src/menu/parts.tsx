@@ -11,6 +11,7 @@ import {
 import { CSSProperties, ReactNode, useState, VFC } from "react";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { updateSetting } from "../settings";
+import { smallButton } from "../components/look";
 import { useSettings } from "./useSettings";
 
 // Small building blocks for the menu: they hide the description texts when "Hide Descriptions"
@@ -40,7 +41,9 @@ export const FocusButton: VFC<{
   disabled?: boolean;
   /** Told when the controller or mouse comes onto the button and leaves it */
   onFocusChange?: (focused: boolean) => void;
-}> = ({ style, onClick, children, disabled, onFocusChange }) => {
+  /** Other properties for the button (aria-label, Steam focus hints...) */
+  extra?: Record<string, any>;
+}> = ({ style, onClick, children, disabled, onFocusChange, extra }) => {
   const [focused, setFocused] = useState(false);
   const on = () => {
     setFocused(true);
@@ -64,7 +67,7 @@ export const FocusButton: VFC<{
       onClick={onClick}
       disabled={disabled}
       // onFocus/onBlur (and the mouse) reach the button but are missing from its type
-      {...({ onFocus: on, onBlur: off, onMouseEnter: on, onMouseLeave: off } as any)}
+      {...({ ...(extra || {}), onFocus: on, onBlur: off, onMouseEnter: on, onMouseLeave: off } as any)}
       onGamepadFocus={on}
       onGamepadBlur={off}
     >
@@ -222,4 +225,29 @@ export const ButtonRow: VFC<{ children: ReactNode }> = ({ children }) => (
       {children}
     </Focusable>
   </PanelSectionRow>
+);
+
+/**
+ * Encore's standard button: the shared look (components/look.ts) with Encore's own highlight. Used in
+ * the Pack Manager pages instead of Steam's plain button, so every button looks and reacts the same.
+ */
+export const EncoreButton: VFC<{
+  style?: CSSProperties;
+  active?: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+  children?: ReactNode;
+  onGamepadFocus?: () => void;
+  onGamepadBlur?: () => void;
+  [key: string]: any;
+}> = ({ style, active, onClick, disabled, children, onGamepadFocus, onGamepadBlur, ...rest }) => (
+  <FocusButton
+    style={{ ...smallButton(active), ...(style || {}) }}
+    onClick={onClick || (() => {})}
+    disabled={disabled}
+    onFocusChange={(f) => (f ? onGamepadFocus?.() : onGamepadBlur?.())}
+    extra={rest}
+  >
+    {children}
+  </FocusButton>
 );

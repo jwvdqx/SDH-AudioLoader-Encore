@@ -36,17 +36,29 @@ export function setFadePlayer(el: any): void {
   currentPlayer = el;
 }
 
+/**
+ * A point of a fade, p from 0 (start) to 1 (end). Equal-power curves: rising follows sin, falling follows
+ * cos, so during a crossfade (one music fading out while the next fades in) the total loudness stays even,
+ * and a fade-out does not seem to drop off suddenly at the end like a straight line does.
+ */
+export function fadeValue(from: number, to: number, p: number): number {
+  const t = Math.max(0, Math.min(1, p));
+  if (to >= from) return from + (to - from) * Math.sin((t * Math.PI) / 2);
+  return to + (from - to) * Math.cos((t * Math.PI) / 2);
+}
+
 function rampFade(el: any, to: number, ms: number, done?: () => void) {
   const old = fadeTimers.get(el);
   if (old) clearInterval(old);
   const from = typeof el.alFade === "number" ? el.alFade : 1;
-  const steps = Math.max(1, Math.round(ms / STEP_MS));
-  let n = 0;
+  // Timed by the clock, not by counting ticks: slowed-down timers (a game starting) do not stretch it
+  const start = Date.now();
+  const length = Math.max(1, ms);
   const timer = setInterval(() => {
-    n++;
-    el.alFade = from + ((to - from) * n) / steps;
+    const p = (Date.now() - start) / length;
+    el.alFade = fadeValue(from, to, p);
     reapply(el);
-    if (n >= steps) {
+    if (p >= 1) {
       clearInterval(timer);
       fadeTimers.delete(el);
       el.alFade = to;
@@ -143,13 +155,13 @@ let duckRamp: ReturnType<typeof setInterval> | null = null;
 function rampDuck(to: number, ms: number, done?: () => void) {
   if (duckRamp) clearInterval(duckRamp);
   const from = musicFx.duck;
-  const steps = Math.max(1, Math.round(ms / STEP_MS));
-  let n = 0;
+  const start = Date.now();
+  const length = Math.max(1, ms);
   duckRamp = setInterval(() => {
-    n++;
-    musicFx.duck = from + ((to - from) * n) / steps;
+    const p = (Date.now() - start) / length;
+    musicFx.duck = fadeValue(from, to, p);
     reapply(currentPlayer);
-    if (n >= steps) {
+    if (p >= 1) {
       if (duckRamp) clearInterval(duckRamp);
       duckRamp = null;
       musicFx.duck = to;

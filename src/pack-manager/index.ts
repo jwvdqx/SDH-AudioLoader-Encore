@@ -1,4 +1,3 @@
-export * from "./AboutPage";
 export * from "./MyPacksPage";
 export * from "./SettingsPage";
 export * from "./PackBrowserPage";

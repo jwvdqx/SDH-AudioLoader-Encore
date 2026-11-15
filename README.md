@@ -2,126 +2,116 @@
 
 > **Unofficial fork** of [DeckThemes/SDH-AudioLoader](https://github.com/DeckThemes/SDH-AudioLoader) by EMERALD0874 and Beebles. All the original work belongs to them. This fork is **not** supported by the DeckThemes team. Please do not ask them about problems with it; open an issue here instead.
 
-Encore adds new options to the "legacy" menu music of Audio Loader (turn on **Enable Legacy Features** in the plugin menu to see them). The menu has tabs: **Music**, **Sounds**, **Effects**, **Library** and **Info**, and the settings inside are grouped (the groups open and close, and **Hide Descriptions** in the Info tab makes the menu shorter).
+Custom Steam Deck UI sounds and menu music, with a full music player around it: shuffle modes, continuous playback, loudness normalizing, a muffled-music filter for menus and pop-ups, your Steam soundtracks, and songs from SoundCloud and YouTube.
 
-**Music tab**
-- **Now Playing card** at the top: the current pack and its credits, a **progress bar** with the time played and the length, an **Up next** line, and the **Pause/Play**, **Skip** and **play mode** buttons. The Up next music is chosen ahead of time and remembered, so it is what really plays when the music ends or when you press Skip. In Repeat mode it says the same music plays again, and a small line under it shows where Skip would go.
-- **New Music Every Day**: picks a different music pack each day. Choosing "None" keeps the music off until the next day.
-- **Play Mode** (Rotation group, and the button on the Now Playing card, which cycles through the modes): **Repeat** loops the current music. **Shuffle** is random: when the music ends, after a game closes, or after the Deck wakes up, a random pack plays, but nothing from the last half of your library (blocked packs are never picked, favorites get no extra weight). **Smart Shuffle** is the same, but it avoids recent packs and series (the **Variety** slider) and plays favorites more often. Skip also follows the mode. This replaces the old **New Music Every Replay** switch: if it was on, Encore starts in Smart Shuffle, which behaves exactly like before.
-- **Variety** slider (shown in Smart Shuffle): 0 is completely random. Higher avoids packs played recently and packs from the same series (like several games of one franchise). At 100 it avoids everything played in the last 75% of your library (with 200 tracks, at least 150 others play before one comes back) and the last 3 series. Large albums come up more often than small ones (by the square root of their size), so the few tracks of a small album do not repeat over and over.
-- **Music by Time of Day**: choose a music pack for the morning (5:00-11:59), afternoon (12:00-17:59) and night (18:00-4:59). It is used when the Deck starts or wakes up, and once when a new part of the day begins; after that the music shuffles as usual (before, every replay picked the same pack again, which sounded like a loop). A part of the day left on "Not set" follows the normal rules.
-- **Show Now Playing Notifications**: an Encore popup with the music pack's name and credits whenever new music starts. Turn it off to suppress only these Now Playing popups; the Now Playing player card and all other Steam/Decky notifications are unaffected. A long pack name scrolls so it can be read completely.
-- **Wait for Startup Movie**: the music waits until the startup or wake-up movie has finished.
-- **Smooth Fades**: the music fades in when it starts, fades out when a game starts or you pause it, and blends into the next music.
-- **Lower Music for Notifications**: briefly lowers the music when Steam plays a notification, message or achievement sound.
-- **Soft Start for New Audio Device**: lowers the music for a moment when headphones or a Bluetooth speaker connect.
-- **Battery Saver**: pauses the music when the battery is below a level you choose and the charger is not connected.
-- **Sleep Timer**: stops the music after the time you set. It comes back when the Deck wakes up, a game closes, or you press Resume.
+- [Install](#install)
+- [The side menu](#the-side-menu)
+- [The Pack Manager](#the-pack-manager)
+- [How the options work together](#how-the-options-work-together)
+- [Good to know (disclaimers)](#good-to-know-disclaimers)
+- [Status and testing](#status-and-testing)
+- [Building](#building)
+- [Credits and license](#credits-and-license)
 
-**Music tab** (below Music Volume)
-- **Normalize Music Volume**: makes every music pack about equally loud. Loudness is measured the way the ear hears it (LUFS, the method streaming services use): deep bass counts less, and silence or quiet intros are left out, so they do not make a song look quieter than it is. Quiet music is boosted (up to +20 dB, even past the normal maximum volume) and loud music is turned down (up to -30 dB). A gentle leveler also evens out the loud parts inside a song and keeps boosted music from distorting. Each song is measured the first time it plays (a few seconds; the result is saved).
+## Install
 
-**Controller buttons for the music (media keys)**
-- With **Media Keys Control the Music** on (Music tab > Playback, on by default), the keys **Next** (skip), **Prev** (the music before), **Play** (pause / resume) and **Stop** (pause) control the menu music.
-- To put them on controller buttons: Steam Settings > Controller > **Guide Button Chord Layout** > Edit (works everywhere in Steam, with Steam held), or any game's controller layout. Pick a button, then **Keyboard > Numpad**: Play, Stop, Next, Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
-- Nothing happens while a game is running (the music is paused then, and the keys belong to the game).
-
-**Find Music** (Pack Manager)
-- Off and greyed out until you press **Set Up Find Music**. Set up downloads **yt-dlp** (about 40 MB), a free open-source downloader, only from its official GitHub releases, with its checksum checked. It updates itself (once a day, and right away when a download fails), keeps the previous version for **Undo**, and can be **Removed**.
-- When YouTube or SoundCloud changes and no yt-dlp version works, a warning explains that Encore depends on yt-dlp and is waiting for its fix. Installed packs are never affected.
-- **Search SoundCloud or YouTube**: 10 results per page, with badges for songs already added, preview-only (Go+) tracks and very long ones. Moving down onto the page numbers selects the page you most likely want next (forward or back, following your direction); the last page hides a small λ.
-- **Download** fills in the details automatically and shows the pack card as it will look in My Packs, with **OK** and **Edit** (clear buttons for each field, Clear All). Nothing downloads before OK.
-- **YouTube** needs **Deno** (about 90 MB), downloaded from its official releases the first time you download from YouTube. If YouTube asks to "confirm you're not a bot", a separate warning explains that this is a temporary block of the network, not a broken yt-dlp. Encore never signs in to your account.
-- Downloads run in the background with a progress bar, pause during games (unless **Keep Downloading While a Game Runs** is on) and continue afterwards. The same song is never added twice (Encore remembers each song's site and track id).
-
-**Storage** (Pack Manager > Settings)
-- How much space each part of Encore uses, on a bar for the whole drive and one for Encore alone. **Clean Up** deletes only files that are safe to delete, and asks first.
-
-**Steam Music tab**
-- Lists every track of the Steam soundtracks you own and have downloaded (in `steamapps/music`, on the internal drive and on SD cards or other library drives). Download a soundtrack in Steam, then press **Scan Again**. The list is also refreshed each time the plugin starts.
-- Tracks are grouped by soundtrack, with the cover, title, artist and track number. Pick a track to play it as menu music (Enable Legacy Features must be on). It then works with the other music options (Normalize Music Volume, Muffled Music, Now Playing, Smooth Fades...).
-- The information comes from the files' tags (MP3, FLAC, Ogg Vorbis/Opus, M4A). Missing information is filled in from the soundtrack's Steam name, the folder and file names (like "03 - Boss Fight"), and otherwise a placeholder ("Unknown Artist", a generic cover). Filled-in values are shown dimmed. The cover is the picture inside the files, a picture in the soundtrack folder, or Steam's own picture of the soundtrack.
-- When a soundtrack has the same track in several formats (MP3 and FLAC), it is listed once (the MP3).
-- **Use in Random Picks**: off by default, so a large soundtrack collection does not crowd out your music packs. When on, Steam tracks can be chosen by New Music Every Day, Shuffle / Smart Shuffle and Skip.
-- Nothing in the Steam folders is changed: Encore only makes links to the tracks in its own folder (`homebrew/sounds/steam_music_links`), because Steam's screen can only play files from there.
-
-**Sounds tab**
-- **Normalize Sound Effect Volume**: the same for sound packs, separate from the music. A limiter keeps boosted packs from distorting. Steam's own default sounds are not changed.
-
-Settings from older versions: if the single **Normalize Volume** switch was on, both new switches start on. Songs measured by older versions are measured again once with the new method.
-
-**Effects tab**
-- **Muffled Music (Low-Pass Filter)**: seven separate toggles: **Steam Menu** (Steam button), **Quick Access Menu (...)**, **Game Loading** (from pressing play until the game has started and the music has stopped), **Pop-ups and Notifications** (while a pop-up such as a confirmation box is open, and for a few seconds when a notification comes in), **Skip Now Playing Notifications** (an extra switch: Encore's own Now Playing notification does not muffle the music, other notifications still do; it only matters when Pop-ups and Notifications is on), **Volume** (while the volume is being changed, and for 1.5 seconds after) and **Microphone** (for a moment, 1.5 seconds, each time the microphone is switched on or off or its volume changes; experimental, it reads Steam's audio devices twice a second). While one is active, the menu music is smoothly muffled; it opens up again a bit more slowly, so the change is not abrupt. A **Filter Strength** slider (0-100%) sets how muffled it is, and you hear the filter for a moment when you move it. Only Encore's menu music is filtered, not Steam's sound effects or the game.
-
-**Library tab**
-- A summary of your packs, and buttons for **My Packs**, **Find Music** and **Browse New Packs**. The Music and Sounds tabs have a **Library** button that opens My Packs.
-
-**Pack Manager** (full screen): four pages, **My Packs**, **Find Music**, **Browse** (the pack website) and **Settings** (storage, the optional pack website account, credits).
-
-**My Packs** (first page of the Pack Manager)
-- Every installed pack as a card, in a **Music** and a **Sounds** section: picture (from the pack website when it has one), name, author, version, how often it played, and badges for **Playing**, **In use**, **Favorite** (★), **Never pick** and **Update**.
-- Quick buttons on each card: **Play now** (music) or **Use these sounds**, **Favorite** (comes up 3 times as often), **Never pick automatically** (you can still choose it by hand), **Update** (when a newer version exists), **Details**, and **Uninstall** (asks first). The selected button's name is shown on the card.
-- Filter (All, Music, Sounds), **Show only** (Favorites, Never pick, Updates, From Find Music, From the pack website, Added by hand; they can be combined), sort (name, most played, least played) and search by name or author. A **Steam Default Sounds** card switches back to Steam's own sounds.
-- This replaces the old Uninstall page, and the Favorites & Blocked dropdowns that were in the Library tab.
-- **Play stats**: the most and least played packs.
-
-**Info tab**
-- **Updates**: shows the installed version and whether a newer release exists on GitHub (checked when the menu opens, at most every 6 hours, and you can turn it off). Nothing is installed automatically.
-- **Recent Music Decisions**, **Copy Debug Info** and **Show Debug Info**: what the plugin decided lately (which music and why) and your settings, to paste when reporting a problem.
-
-**Music after sleep**: the menu music did not come back after the Deck woke from sleep. Encore notices the wake-up and starts the music again. It also restarts the music if it should be playing but has gone silent, and it leaves it alone while a game is running or when another plugin paused it on purpose.
-
-The toggles can be used together. With "New Music Every Day" on and a Shuffle mode chosen, the first music of a new day is the daily pick, and later replays rotate to other packs. Priority at startup and after waking: Time of Day, then Daily, then Replay. The Time of Day pack plays once per part of the day, even if you switch to Desktop Mode and back or the Deck sleeps. The play history is saved, so restarts do not reset it.
-
-The two menu toggles of the low-pass filter read which side menu Steam has open. The game loading toggle uses Steam's game launch events; when the game process starts, the filter stays on until the music has stopped (at most 4 seconds), so the music is never heard unfiltered for a moment before it cuts. The pop-up toggle listens for Steam's "dialog opened/closed" and notification sounds and also looks for dialogs on the screen.
-
-**No more pops when the music stops**: while the music goes through Encore's audio chain (when Normalize Music Volume or a low-pass toggle is on), stopping or pausing it always takes a very short fade (about 0.15 s), even with Smooth Fades off, so it does not click.
-
-## Honest status
-Encore is used and tested on one Steam Deck by its author, mainly the daily toggle, the sleep/wake fix and the new menu. Most other features were also checked with simulated players before release, so some of them may still behave differently on your Deck. Parts that depend on Steam's own events (menu and pop-up detection for the low-pass filter, game loading, battery, new audio devices, notification sounds, the startup movie wait) are the most likely to need fixes. Version 1.5.1 added the **Volume** and **Microphone** low-pass toggles: **Volume** is based on the sound Steam plays when the volume changes, but **Microphone** depends on what Steam reports about its audio devices and has not been confirmed on a real Deck (see the changelog). Version 1.3.1 fixed **Wait for Startup Movie**, which did not work in 1.3.0 (it is not confirmed on a real Deck yet), and 1.3.2 made the selected tab or group visible in the menu. If something does not work, please open an issue on GitHub, say which toggles you had on, and paste the **Copy Debug Info** text.
-
-## Test checklist (for anyone trying Encore)
-1. Install, turn on **Enable Legacy Features**, pick a music pack. Music plays.
-2. Open the **Info** tab: the version is shown. Press **Show Debug Info**.
-3. **Skip** (Now Playing card) switches to another pack.
-4. Set **Play Mode** to Shuffle or Smart Shuffle (or press the mode button on the card), start and close a game: different music plays afterwards. The **Up next** line shows what comes next, and **Skip** plays exactly that. The progress bar moves while music plays. In Repeat the music loops.
-5. Put the Deck to sleep and wake it: the music comes back.
-6. **Effects** tab: turn on **Steam Menu**, press the Steam button: the music is muffled. Same for **Quick Access Menu (...)**, **Game Loading** and **Pop-ups and Notifications** (for example the "exit game?" confirmation box).
-7. Turn on **Smooth Fades**: music fades in when it starts.
-8. **Steam Music** tab: with a soundtrack downloaded in Steam, press **Scan Again**: its tracks are listed with cover and names. Pick one: it plays as menu music.
-9. **Sleep Timer**: start a short timer (5 min): the music stops, and comes back after a wake-up or **Resume Music**.
-10. Switch to Desktop Mode and back: the music should not be the same pack as before.
-
-## Installation (from Decky Loader, no computer needed)
-Encore is not in the Decky plugin store, but Decky can install it straight from a link:
+Encore is not in the Decky plugin store, but Decky can install it from a link:
 
 1. Install [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader).
-2. **Uninstall the original Audio Loader first** (in Decky's plugin list), because the two would fight over the same sounds. Your sound packs and settings stay where they are.
-3. Open the Decky menu, go to **Settings** (the gear), then **General**, and turn on **Developer Mode**.
-4. Open the new **Developer** page and choose **Install Plugin from URL**.
-5. Paste this link and install: `https://github.com/jwvdqx/SDH-AudioLoader-Encore/releases/latest/download/Audio-Loader-Encore.zip`
-6. Decky may ask you to confirm. Accept. If the plugin does not show up, restart Decky Loader or the Deck.
+2. **Uninstall the original Audio Loader first** (in Decky's plugin list): the two would fight over the same sounds. Your packs and settings stay.
+3. Decky menu > **Settings** (gear) > **General**: turn on **Developer Mode**.
+4. Open the **Developer** page > **Install Plugin from URL**, paste this link and install:
+   `https://github.com/jwvdqx/SDH-AudioLoader-Encore/releases/latest/download/Audio-Loader-Encore.zip`
+5. If the plugin does not show up, restart Decky Loader or the Deck.
 
-You can also download the zip from the [Releases page](../../releases) and copy the `Audio Loader Encore` folder into `/home/deck/homebrew/plugins/` yourself.
+You can also download the zip from the [Releases page](../../releases) and copy the `Audio Loader Encore` folder into `/home/deck/homebrew/plugins/`.
 
-## Building it yourself
-`pnpm install` and then `pnpm build` create `dist/index.js`. The GitHub Action in `.github/workflows/build.yml` does this automatically and collects the files the Deck needs. It also runs a small set of automatic tests first (`pnpm test`): music picking, volume math, saved settings and pack zip safety. If one fails, the build stops.
+Music needs **Enable Legacy Features** (Music tab) to be on.
+
+## The side menu
+
+Six tabs. Settings are grouped (groups open and close), and **Hide Descriptions** (Info tab) makes the menu shorter. Settings with a few choices are dropdowns.
+
+### Music
+- **Now Playing card**: the music, its credits (title, artist and cover for Steam tracks), a progress bar, **Up next**, and **Play/Pause**, **Skip** and **Play Mode** buttons.
+- **Music Pack**, **Music Volume**, **Normalize Music Volume** and a **Library** button.
+- **Normalize Music Volume**: every pack about equally loud, measured the way the ear hears it (LUFS: deep bass counts less, silence and quiet intros are left out). Quiet music is boosted (up to +20 dB, past the normal maximum), loud music turned down (up to -30 dB), and a gentle leveler evens out loud parts and keeps boosted music from distorting. Each song is measured once.
+- **Rotation**
+  - **New Music Every Day**: a different pack each day.
+  - **Play Mode**: **Repeat** loops the music. **Shuffle** is random, but nothing from the last half of your library. **Smart Shuffle** also avoids recent packs and series (**Variety**: at 100, the last 75% of your library and the last 3 series) and plays favorites 3 times as often; large albums come up more than small ones (by the square root of their size). Skip follows the mode.
+  - **Music by Time of Day**: a pack for the morning (5:00-11:59), afternoon (12:00-17:59) and night (18:00-4:59), played once when that part of the day begins.
+- **Playback**
+  - **Continuous Playback**: the music carries on where it left off after a game, after sleep, and after Steam restarts or the Deck is turned off and on. See [Good to know](#good-to-know-disclaimers).
+  - **Media Keys Control the Music**: the **Next**, **Prev**, **Play** and **Stop** keys skip, go back, pause and resume. Put them on controller buttons in Steam Input: Settings > Controller > **Guide Button Chord Layout** (Steam + a button, everywhere in Steam), pick a button, then **Keyboard > Numpad** > Play / Stop / Next / Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
+  - **Show Now Playing Notifications**, **Wait for Startup Movie**, **Smooth Fades** (equal-power crossfades, so the loudness stays even while one music fades into the next).
+  - **Lower the Music For**: notifications, a new audio device (headphones, Bluetooth), both, or nothing.
+- **Battery & Sleep Timer**: **Battery Saver** (off, or pause below 10-50%) and a **Sleep Timer**.
+
+### Steam Music
+Every track of the Steam soundtracks you own and have downloaded (all library drives), grouped by soundtrack with cover, title, artist and track number. Pick a track to play it as menu music. Information comes from the files' tags (MP3, FLAC, Ogg, Opus, M4A), else from Steam's soundtrack name and the file names, else a placeholder (shown dimmed). A track in several formats is listed once. **Use in Random Picks** (off by default) lets the shuffle modes choose them. Nothing in the Steam folders is changed: Encore links to the files from its own folder.
+
+### Sounds
+**Sound Pack**, **Sound Volume**, **Normalize Sound Effect Volume** (with a limiter, so boosted packs do not distort) and a **Library** button.
+
+### Effects: Muffled Music (low-pass filter)
+The menu music is smoothly muffled while: **Menus** (Steam menu, Quick Access, or both), **Game Loading** (until the game has started and the music has stopped), **Pop-ups and Notifications** (all, or all but Encore's own Now Playing), **Volume and Microphone** (for a moment after a change; the microphone part is experimental). **Filter Strength** sets how muffled. Only Encore's music is filtered.
+
+### Library
+A summary of your packs, the **Play Stats**, and buttons to **My Packs**, **Find Music** and **Browse New Packs**.
+
+### Info
+Installed version and **Check for Updates** (also automatic, at most every 6 hours; nothing is installed by itself), **Recent Music Decisions**, **Copy Debug Info** / **Show Debug Info**, and **Hide Descriptions**.
+
+## The Pack Manager
+
+Full screen, four pages, all in the same card style.
+
+### My Packs
+Every installed pack as a card (Music and Sounds sections): picture, name, author, version, plays, and badges (**Playing** / **Paused**, **In use**, ★ favorite, **Never pick**, **Update**, **SoundCloud** / **YouTube**). Buttons on each card: **Play now** or **Use these sounds**, **Favorite**, **Never pick automatically**, **Update**, **Details**, **Uninstall**. One row of options: search, **Type** (all, music, sounds), **Show** (favorites, never pick, updates, from Find Music, from the pack website, added by hand) and **Sort** (name A-Z or Z-A, author, most or least played, recently added). A **Steam Default Sounds** card switches back to Steam's own sounds.
+
+### Find Music
+Search **SoundCloud** or **YouTube** and add a song as a music pack.
+- Off and greyed out until you press **Set Up Find Music**, which downloads **yt-dlp** (about 40 MB), a free open-source downloader, from its official GitHub releases (checksum checked). **Deno** (about 90 MB, needed for YouTube) is downloaded the first time you use YouTube. Both update themselves (once a day, and right away when a download fails), keep the previous version for **Undo**, and can be **Removed**.
+- Options (dropdowns): **Per page** (5, 10, 20 or 50, up to 100 results), **Sort** (best match, shortest, longest, title, uploader, most viewed), **Length** and **Show** (everything, not added yet, can be added). Sorting and filters apply to the page shown.
+- **Listen** plays a song before you add it (the menu music pauses meanwhile). **Download** fills in the details automatically and shows the card as it will look in My Packs, with **OK** and **Edit** (clear buttons per field, Clear All). Nothing is downloaded before OK.
+- Page numbers like a search engine: moving down onto them selects the page you most likely want next (forward or back, following your direction). The last page hides a small surprise.
+- Downloads run in the background, pause during games (unless **Keep Downloading While a Game Runs** is on) and continue afterwards. The same song is never added twice (Encore remembers each song's site and track id, whatever the link looked like).
+- When a site changes and no yt-dlp version works, a warning explains that Encore depends on yt-dlp and is waiting for its fix. When YouTube asks to "confirm you're not a bot", a separate warning explains that it is a temporary block of the network. Encore never signs in to your accounts.
+
+### Browse
+The packs of [deckthemes.com](https://deckthemes.com): search, sort, type, and a details page to install or update a pack (and star it, with the optional account).
+
+### Settings
+**Storage** (how much space each part of Encore uses, with a bar for the drive and one for Encore, and a **Clean Up** that only deletes files that are safe to delete, after asking), the optional pack website account, and the credits.
+
+## How the options work together
+- **When the music starts again** (after a game, after waking, at startup): **Continuous Playback** first (the same music, from where it was), then **Time of Day** (once per part of the day), then **New Music Every Day**, then the **Play Mode**. When a song ends, the Play Mode picks what comes next.
+- The play history and the Time of Day state are saved, so switching to Desktop Mode and back does not reset them.
+- While the music goes through Encore's audio chain (Normalize Music Volume or a muffled-music option is on), stopping it takes a very short fade so it never clicks.
+- **After sleep** Encore notices the wake-up and brings the music back, and restarts it if it should play but has gone silent. It leaves it alone during games and when another plugin paused it on purpose.
+
+## Good to know (disclaimers)
+- **Encore depends on Steam, SteamOS and Decky.** It reads Steam's menus, pop-ups, game launches, sleep and audio devices, and plays its music through Steam's screen. A Steam, SteamOS or Decky update can change any of that. When something stops working after an update, please open an issue with the **Copy Debug Info** text.
+- **Continuous Playback** relies on how Steam pauses, sleeps and restarts. If an update changes that, the music simply starts from the beginning instead.
+- **Find Music** depends on **yt-dlp** and on YouTube and SoundCloud, which change often. Encore keeps yt-dlp up to date, but there can be days where a site does not work until yt-dlp's team releases a fix. Only download music you have the right to use and follow the sites' terms. Songs stay on your Deck.
+- **The microphone part of Muffled Music** depends on what Steam reports about its audio devices and is not confirmed on every Deck.
+
+## Status and testing
+Encore is used on one Steam Deck by its author and checked with automatic tests (run by every build) and simulated players. Parts that depend on Steam's own events are the most likely to need fixes.
+
+Quick checklist:
+1. Enable Legacy Features, pick a music pack: music plays. Info tab shows the version.
+2. **Skip** on the Now Playing card switches music; in Shuffle, closing a game plays something else (with Continuous Playback, the same music carries on).
+3. Sleep and wake the Deck: the music comes back.
+4. Effects: set **Menus** to Both and press the Steam button: the music is muffled.
+5. Library > **My Packs**: play a pack, favorite one, try the filters.
+6. Library > **Find Music**: Set Up, search, Listen, Download > OK.
+7. Steam Music: a downloaded soundtrack is listed and plays.
+
+## Building
+`pnpm install`, then `pnpm build` creates `dist/index.js`. `pnpm test` runs the automatic tests (JavaScript and Python). The GitHub Action in `.github/workflows/build.yml` tests, builds and collects the files the Deck needs, and attaches the zip to a published release. Changes per version are in [CHANGELOG.md](CHANGELOG.md), release texts in `docs/release-notes/`.
 
 ## Credits and license
-Based on Audio Loader by EMERALD0874 and Beebles. Encore changes by jwvdqx, made with the help of Claude (Anthropic).
+Based on Audio Loader by SuchMeme, EMERALD0874 and Beebles. Encore changes by jwvdqx, made with the help of Claude (Anthropic). Pack creation guide: [docs.deckthemes.com](https://docs.deckthemes.com/#/AudioLoader/README).
 
-**Which license applies:** the whole project is released under the **MIT license**, the same as the original Audio Loader (the original copyright notice is kept in `LICENSE`). The `LICENSE` file also contains a second text, the **BSD 3-Clause license of Steam Deck Homebrew**. It belongs to the plugin template that the original Audio Loader was built from, so it covers the parts that come from that template (the basic project and build setup). It is kept because its terms require the notice to stay. It does not change the license of Encore's own additions, which are MIT like the rest.
-
----
-
-# Original README (Audio Loader)
-A plugin for the [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) that allows users to replace Steam UI sounds and (eventually) add music when outside of a game.
-
-# Overview
-This plugin searches all folders in `/home/deck/homebrew/themes` for a `pack.json` file describing the music or sound pack. Users can install packs from the curated Pack Manager while connected to the internet or by manually adding folders (not recommended).
-
-[Information on how to create, test, and upload a pack can be found here.](https://docs.deckthemes.com/#/AudioLoader/README)
-
-# Installation
-1. Install the [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader).
-1. Use the bundled Plugin Store to download the Audio Loader.
+**License:** the project is under the **MIT license**, like the original Audio Loader (its copyright notice is kept in `LICENSE`). `LICENSE` also contains the **BSD 3-Clause license of Steam Deck Homebrew**, which covers the parts that come from the plugin template the original was built from (the basic project and build setup); its terms require the notice to stay. Encore's own additions are MIT like the rest.

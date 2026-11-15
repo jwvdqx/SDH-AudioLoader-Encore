@@ -121,12 +121,6 @@ export async function getBackendVersion(): Promise<any> {
   return server!.callPluginMethod("get_loader_version", {});
 }
 
-export async function fetchPackDb(): Promise<any> {
-  return server!.fetchNoCors("https://api.deckthemes.com/themes/legacy/audio", {
-    method: "GET",
-  });
-}
-
 export function downloadThemeFromUrl(themeId: string): Promise<any> {
   const { apiUrl } = globalState!.getPublicState();
   return server!.callPluginMethod("download_theme_from_url", {

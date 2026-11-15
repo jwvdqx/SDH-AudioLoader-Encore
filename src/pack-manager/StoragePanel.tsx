@@ -1,6 +1,7 @@
-import { ConfirmModal, DialogButton, Focusable, showModal } from "decky-frontend-lib";
+import { ConfirmModal, Focusable, showModal } from "decky-frontend-lib";
 import { useEffect, useState, VFC } from "react";
 import * as python from "../python";
+import { EncoreButton } from "../menu/parts";
 
 // Storage: one bar for the whole drive (like Steam's own storage page), in Encore's colours, with
 // each part of Encore, everything else and free space. Below it, the list, and a clean-up of files
@@ -160,9 +161,9 @@ export const StoragePanel: VFC = () => {
         </>
       )}
       <Focusable style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "10px" }}>
-        <DialogButton style={{ width: "auto", minWidth: "160px" }} disabled={busy} onClick={cleanUp}>
+        <EncoreButton style={{ width: "auto", minWidth: "160px" }} disabled={busy} onClick={cleanUp}>
           {busy ? "Working..." : "Clean Up..."}
-        </DialogButton>
+        </EncoreButton>
         <span style={{ fontSize: "12px", opacity: 0.75 }}>{message}</span>
       </Focusable>
     </div>

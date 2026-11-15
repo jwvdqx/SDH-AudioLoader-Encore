@@ -1,7 +1,7 @@
 import { Dropdown, DropdownOption, Focusable, gamepadDialogClasses, TextField } from "decky-frontend-lib";
 import { FocusButton } from "../menu/parts";
 import { smallButton } from "./look";
-import { useEffect, useMemo, memo } from "react";
+import { useEffect, useMemo } from "react";
 import { TiRefreshOutline } from "react-icons/ti";
 import { ThemeQueryRequest } from "../apiTypes";
 import { genericGET } from "../api";
@@ -138,4 +138,3 @@ export function BrowserSearchFields({
   );
 }
 
-export const MemoizedSearchFields = memo(BrowserSearchFields);

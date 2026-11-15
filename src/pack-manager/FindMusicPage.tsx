@@ -2,7 +2,7 @@ import { ConfirmModal, DialogButton, Focusable, ModalRoot, showModal, TextField,
 import { useEffect, useRef, useState, VFC } from "react";
 import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaPlay, FaSearch, FaStop, FaTimes } from "react-icons/fa";
 import { Dropdown } from "decky-frontend-lib";
-import { FocusButton } from "../menu/parts";
+import { EncoreButton, FocusButton } from "../menu/parts";
 import { chip, smallButton } from "../components/look";
 import { menuMusicControl, pauseMusicSmooth, resumeMusicSmooth } from "../audioPlayers";
 import { Pack } from "../classes";
@@ -179,17 +179,17 @@ export const DownloaderPanel: VFC<{ status: python.ToolsStatus; onStatus: (s: py
         </div>
       </div>
       <Focusable style={{ display: "flex", gap: "8px", flexWrap: "wrap", margin: "8px 0" }}>
-        <DialogButton style={{ width: "auto", minWidth: "140px" }} disabled={!!busy} onClick={() => act("update")}>
+        <EncoreButton style={{ width: "auto", minWidth: "140px" }} disabled={!!busy} onClick={() => act("update")}>
           {busy === "update" ? "Checking..." : "Update Now"}
-        </DialogButton>
-        <DialogButton
+        </EncoreButton>
+        <EncoreButton
           style={{ width: "auto", minWidth: "140px" }}
           disabled={!!busy || !tool.has_previous}
           onClick={() => act("undo")}
         >
           Undo Last Update{tool.previous?.version ? ` (${tool.previous.version})` : ""}
-        </DialogButton>
-        <DialogButton
+        </EncoreButton>
+        <EncoreButton
           style={{ width: "auto", minWidth: "140px", color: "#ff9b9b" }}
           disabled={!!busy}
           onClick={() =>
@@ -204,7 +204,7 @@ export const DownloaderPanel: VFC<{ status: python.ToolsStatus; onStatus: (s: py
           }
         >
           Remove
-        </DialogButton>
+        </EncoreButton>
       </Focusable>
       {message !== "" && <div style={{ fontSize: "12px", color: ACCENT, marginBottom: "6px" }}>{message}</div>}
       <ToggleField
@@ -258,10 +258,10 @@ const SetupCard: VFC<{ onDone: (s: python.ToolsStatus) => void }> = ({ onDone })
       </ul>
       {/* @ts-ignore */}
       <Focusable flow-children="row" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        <DialogButton style={{ width: "auto", minWidth: "220px" }} disabled={busy} onClick={setUp}>
+        <EncoreButton style={{ width: "auto", minWidth: "220px" }} disabled={busy} onClick={setUp}>
           <FaDownload style={{ marginRight: "8px" }} />
           {busy ? "Setting up..." : "Set Up Find Music"}
-        </DialogButton>
+        </EncoreButton>
         {error !== "" && <span style={{ color: "#ff9b9b" }}>{error}</span>}
       </Focusable>
     </div>
@@ -420,13 +420,13 @@ const AddWindow: VFC<{
       <div style={{ flex: 1 }}>
         <TextField label={label} value={draft[key]} onChange={(e: any) => setDraft({ ...draft, [key]: e.target.value })} />
       </div>
-      <DialogButton
+      <EncoreButton
         aria-label={`Clear ${label}`}
         style={{ width: "40px", minWidth: "40px", padding: 0, height: "32px" }}
         onClick={() => setDraft({ ...draft, [key]: "" })}
       >
         <FaTimes />
-      </DialogButton>
+      </EncoreButton>
     </Focusable>
   );
 
@@ -438,12 +438,12 @@ const AddWindow: VFC<{
             <div style={{ fontSize: "1.3em", fontWeight: 700, marginBottom: "4px" }}>Add to My Packs?</div>
             <div style={{ fontSize: "12px", opacity: 0.75, marginBottom: "14px" }}>This is how it will look in your library.</div>
             <Focusable style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "220px" }}>
-              <DialogButton disabled={busy} onClick={ok}>
+              <EncoreButton disabled={busy} onClick={ok}>
                 {busy ? "Starting..." : "OK"}
-              </DialogButton>
-              <DialogButton disabled={busy} onClick={() => { setDraft({ ...details }); setEditing(true); }}>
+              </EncoreButton>
+              <EncoreButton disabled={busy} onClick={() => { setDraft({ ...details }); setEditing(true); }}>
                 Edit
-              </DialogButton>
+              </EncoreButton>
             </Focusable>
             {error !== "" && <div style={{ color: "#ff9b9b", fontSize: "12px", marginTop: "10px" }}>{error}</div>}
           </div>
@@ -483,18 +483,18 @@ const AddWindow: VFC<{
               {draft.cover ? "Cover: the track's picture" : "No cover (a music icon is shown)"}
             </div>
             {draft.cover ? (
-              <DialogButton style={{ width: "40px", minWidth: "40px", padding: 0, height: "32px" }} onClick={() => setDraft({ ...draft, cover: "" })}>
+              <EncoreButton style={{ width: "40px", minWidth: "40px", padding: 0, height: "32px" }} onClick={() => setDraft({ ...draft, cover: "" })}>
                 <FaTimes />
-              </DialogButton>
+              </EncoreButton>
             ) : track.fill.cover ? (
-              <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ ...draft, cover: track.fill.cover })}>
+              <EncoreButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ ...draft, cover: track.fill.cover })}>
                 Use Picture
-              </DialogButton>
+              </EncoreButton>
             ) : null}
           </Focusable>
           {/* @ts-ignore */}
           <Focusable flow-children="row" style={{ display: "flex", gap: "8px" }}>
-            <DialogButton
+            <EncoreButton
               style={{ width: "auto", minWidth: "120px" }}
               disabled={draft.name.trim() === ""}
               onClick={() => {
@@ -503,13 +503,13 @@ const AddWindow: VFC<{
               }}
             >
               Save
-            </DialogButton>
-            <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ name: "", artist: "", description: "", cover: "" })}>
+            </EncoreButton>
+            <EncoreButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setDraft({ name: "", artist: "", description: "", cover: "" })}>
               Clear All
-            </DialogButton>
-            <DialogButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setEditing(false)}>
+            </EncoreButton>
+            <EncoreButton style={{ width: "auto", minWidth: "120px" }} onClick={() => setEditing(false)}>
               Cancel
-            </DialogButton>
+            </EncoreButton>
           </Focusable>
           {draft.name.trim() === "" && <div style={{ fontSize: "12px", opacity: 0.7, marginTop: "8px" }}>A pack name is needed to save.</div>}
         </div>
@@ -553,9 +553,9 @@ const JobBar: VFC<{ job: python.DownloadJob; onCancel: () => void }> = ({ job, o
         </div>
       </div>
       {active && (
-        <DialogButton style={{ width: "auto", minWidth: "100px" }} onClick={onCancel}>
+        <EncoreButton style={{ width: "auto", minWidth: "100px" }} onClick={onCancel}>
           Cancel
-        </DialogButton>
+        </EncoreButton>
       )}
     </Focusable>
   );
@@ -764,20 +764,14 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
       {/* @ts-ignore */}
       <Focusable flow-children="row" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
         {SITES.map((s) => (
-          <DialogButton
+          <FocusButton
             key={s.id}
             disabled={!s.ready}
             onClick={() => setSite(s.id)}
-            style={{
-              width: "auto",
-              minWidth: 0,
-              padding: "6px 14px",
-              background: site === s.id ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : undefined,
-              color: site === s.id ? "#fff" : undefined,
-            }}
+            style={{ ...smallButton(site === s.id), padding: "0 16px", borderRadius: "16px" }}
           >
             {s.label}
-          </DialogButton>
+          </FocusButton>
         ))}
         <div style={{ flex: 1 }}>
           <TextField
@@ -787,10 +781,10 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
             {...({ onKeyDown: (e: any) => e.key === "Enter" && newSearch() } as any)}
           />
         </div>
-        <DialogButton style={{ width: "auto", minWidth: "110px" }} disabled={loading || query.trim() === ""} onClick={newSearch}>
-          <FaSearch style={{ marginRight: "6px" }} />
+        <FocusButton style={{ ...smallButton(true), minWidth: "110px" }} disabled={loading || query.trim() === ""} onClick={newSearch}>
+          <FaSearch />
           Search
-        </DialogButton>
+        </FocusButton>
       </Focusable>
       {/* Options, compact: each one is a dropdown */}
       {/* @ts-ignore */}
@@ -833,11 +827,12 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
             {Array.from({ length: shown }, (_, i) => i + 1).map((n) => {
               const egg = showsEasterEgg(n, page, shown, lastPage, direction, maxPages) && focused === n;
               return (
-                <DialogButton
+                <EncoreButton
                   key={n}
                   {...({ preferredFocus: n === target, autoFocus: false } as any)}
                   onGamepadFocus={() => setFocused(n)}
                   onGamepadBlur={() => setFocused((f) => (f === n ? null : f))}
+                  active={n === page}
                   onClick={() => n !== page && goTo(n)}
                   style={{
                     width: "40px",
@@ -849,13 +844,11 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: n === page ? 800 : 500,
-                    color: n === page ? "#fff" : undefined,
-                    background: n === page ? "linear-gradient(145deg, rgba(120, 70, 190, 0.95), rgba(60, 40, 110, 0.95))" : undefined,
                     boxShadow: egg ? "0 0 12px rgba(255, 157, 26, 0.8)" : undefined,
                   }}
                 >
                   {egg ? <Lambda /> : n}
-                </DialogButton>
+                </EncoreButton>
               );
             })}
           </Focusable>
@@ -897,15 +890,15 @@ export const FindMusicPage: VFC = () => {
           {/* The search, greyed out until Find Music is set up */}
           <div style={{ opacity: 0.35, pointerEvents: "none", marginBottom: "14px" }}>
             <Focusable style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
+              <EncoreButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
                 SoundCloud
-              </DialogButton>
+              </EncoreButton>
               <div style={{ flex: 1 }}>
                 <TextField disabled placeholder="Search songs or artists" value="" />
               </div>
-              <DialogButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
+              <EncoreButton style={{ width: "auto", minWidth: 0, padding: "6px 14px" }} disabled>
                 <FaSearch />
-              </DialogButton>
+              </EncoreButton>
             </Focusable>
           </div>
           <SetupCard onDone={setStatus} />
