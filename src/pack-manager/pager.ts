@@ -17,9 +17,9 @@ export function directionAfter(from: number, to: number, before: Direction): Dir
 }
 
 /** How many page numbers to show: every page seen, plus one more while there may be more results. */
-export function pagesToShow(current: number, highestSeen: number, lastPage: number | null): number {
-  if (lastPage !== null) return Math.min(MAX_PAGES, lastPage);
-  return Math.min(MAX_PAGES, Math.max(current, highestSeen) + 1);
+export function pagesToShow(current: number, highestSeen: number, lastPage: number | null, maxPages = MAX_PAGES): number {
+  if (lastPage !== null) return Math.min(maxPages, lastPage);
+  return Math.min(maxPages, Math.max(current, highestSeen) + 1);
 }
 
 /** The page number selected when the selection enters the numbers. */
@@ -29,7 +29,14 @@ export function preselected(current: number, shown: number, direction: Direction
 }
 
 /** The easter egg: going forward on the last page, the current (last) number is selected. */
-export function showsEasterEgg(page: number, current: number, shown: number, lastPage: number | null, direction: Direction): boolean {
-  const isLast = lastPage !== null ? current >= lastPage : current >= MAX_PAGES;
+export function showsEasterEgg(
+  page: number,
+  current: number,
+  shown: number,
+  lastPage: number | null,
+  direction: Direction,
+  maxPages = MAX_PAGES
+): boolean {
+  const isLast = lastPage !== null ? current >= lastPage : current >= maxPages;
   return isLast && direction === "forward" && page === current && current === shown;
 }

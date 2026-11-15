@@ -1,8 +1,12 @@
 import { ConfirmModal, DialogButton, Focusable, ModalRoot, showModal, TextField, ToggleField } from "decky-frontend-lib";
 import { CSSProperties, useEffect, useRef, useState, VFC } from "react";
-import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaSearch, FaTimes } from "react-icons/fa";
+import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaPlay, FaSearch, FaStop, FaTimes } from "react-icons/fa";
+import { Dropdown } from "decky-frontend-lib";
+import { FocusButton } from "../menu/parts";
+import { menuMusicControl, pauseMusicSmooth, resumeMusicSmooth } from "../audioPlayers";
 import { Pack } from "../classes";
 import { PackCard } from "./MyPacksPage";
+import { arrange, LENGTH_OPTIONS, LengthKey, PAGE_SIZE_OPTIONS, SHOW_OPTIONS, ShowKey, SORT_OPTIONS, SortKey } from "./findOptions";
 import { Direction, directionAfter, pagesToShow, preselected, showsEasterEgg } from "./pager";
 import { useSettings } from "../menu/useSettings";
 import * as python from "../python";
@@ -289,7 +293,28 @@ export const formatDuration = (s: number) => {
   return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
 };
 
-const ResultCard: VFC<{ track: python.FoundTrack; onDownload: () => void }> = ({ track, onDownload }) => {
+const cardButton = (active = false): CSSProperties => ({
+  minWidth: 0,
+  width: "auto",
+  height: "32px",
+  padding: "0 8px",
+  fontSize: "12px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  borderRadius: "6px",
+  border: "1px solid rgba(120, 100, 170, 0.3)",
+  background: active ? "linear-gradient(145deg, rgba(120, 70, 190, 0.85), rgba(60, 40, 110, 0.9))" : "rgba(40, 32, 70, 0.75)",
+  color: active ? "#fff" : "#d9ccef",
+});
+
+const ResultCard: VFC<{
+  track: python.FoundTrack;
+  onDownload: () => void;
+  previewState: "" | "loading" | "playing";
+  onPreview: () => void;
+}> = ({ track, onDownload, previewState, onPreview }) => {
   const blocked = !!track.installed || track.preview_only;
   return (
     <div
@@ -340,15 +365,20 @@ const ResultCard: VFC<{ track: python.FoundTrack; onDownload: () => void }> = ({
           {track.uploader}
         </div>
       </div>
-      <Focusable style={{ padding: "4px 8px 8px" }}>
-        <DialogButton style={{ minWidth: 0, padding: "6px", fontSize: "13px" }} disabled={blocked} onClick={onDownload}>
+      {/* @ts-ignore */}
+      <Focusable flow-children="row" style={{ display: "flex", gap: "4px", padding: "4px 8px 8px" }}>
+        <FocusButton style={{ ...cardButton(previewState !== ""), flex: "0 0 auto", width: "72px" }} onClick={onPreview}>
+          {previewState === "playing" ? <FaStop /> : <FaPlay />}
+          {previewState === "loading" ? "..." : previewState === "playing" ? "Stop" : "Listen"}
+        </FocusButton>
+        <FocusButton style={{ ...cardButton(), flex: 1 }} disabled={blocked} onClick={onDownload}>
           {track.installed ? "Already added" : track.preview_only ? "Preview only (Go+)" : (
             <>
-              <FaDownload style={{ marginRight: "6px" }} />
+              <FaDownload />
               Download
             </>
           )}
-        </DialogButton>
+        </FocusButton>
       </Focusable>
     </div>
   );
@@ -564,6 +594,100 @@ const SITES = [
   { id: "youtube", label: "YouTube", ready: true },
 ];
 
+// ---- options: results per page, sort and filters (on the page that is shown)
+
+const Option: VFC<{ label: string; value: any; options: { data: any; label: string }[]; onChange: (v: any) => void }> = ({
+  label,
+  value,
+  options,
+  onChange,
+}) => (
+  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+    <span style={{ fontSize: "12px", opacity: 0.7 }}>{label}</span>
+    <div style={{ minWidth: "130px" }}>
+      <Dropdown rgOptions={options} selectedOption={value} onChange={(o) => onChange(o.data)} />
+    </div>
+  </div>
+);
+
+// Listening before downloading: one song at a time. The menu music pauses meanwhile, and continues
+// when the preview stops (or the page is left).
+function usePreview() {
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const pausedMusic = useRef<any>(null);
+  const [current, setCurrent] = useState("");
+  const [loading, setLoading] = useState("");
+  const [error, setError] = useState("");
+  const keyOf = (t: python.FoundTrack) => `${t.site}:${t.id}`;
+
+  // resumeMusic false: another preview starts right away, the menu music stays paused
+  const stop = (resumeMusic = true) => {
+    if (audio.current) {
+      audio.current.pause();
+      audio.current.src = "";
+      audio.current = null;
+    }
+    setCurrent("");
+    setLoading("");
+    if (!resumeMusic) return;
+    const music = pausedMusic.current;
+    pausedMusic.current = null;
+    if (music) {
+      menuMusicControl.pausedByOtherPlugin = false;
+      Promise.resolve(resumeMusicSmooth(music)).catch(() => {});
+    }
+  };
+
+  const toggle = async (t: python.FoundTrack) => {
+    const key = keyOf(t);
+    if (current === key || loading === key) {
+      stop();
+      return;
+    }
+    stop(false);
+    setError("");
+    setLoading(key);
+    const r = await python.findMusicStream(t.site, t.url);
+    if (!r.ok || !r.url) {
+      stop();
+      setError(r.error === "blocked" ? "YouTube asked to confirm you're not a bot, try later" : r.error || "not available");
+      return;
+    }
+    const live = python.liveState();
+    const music = live.menuMusic;
+    if (music && !music.paused && !pausedMusic.current) {
+      // Paused on purpose: the music guard must not start it again during the preview
+      menuMusicControl.pausedByOtherPlugin = true;
+      pauseMusicSmooth(music);
+      pausedMusic.current = music;
+    }
+    const el = new Audio(r.url);
+    el.volume = Math.max(0.05, Math.min(1, Number(live.musicVolume) || 0.5));
+    el.onended = () => stop();
+    el.onerror = () => {
+      setError("this song cannot be played here");
+      stop();
+    };
+    audio.current = el;
+    setLoading("");
+    setCurrent(key);
+    el.play().catch(() => {
+      setError("the preview was refused");
+      stop();
+    });
+  };
+
+  // Leaving the page stops the preview
+  useEffect(() => () => stop(), []);
+
+  return {
+    toggle,
+    stop: () => stop(),
+    error,
+    stateOf: (t: python.FoundTrack): "" | "loading" | "playing" => (loading === keyOf(t) ? "loading" : current === keyOf(t) ? "playing" : ""),
+  };
+}
+
 const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => {
   const [site, setSite] = useState("soundcloud");
   const [query, setQuery] = useState("");
@@ -577,17 +701,25 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
   const [direction, setDirection] = useState<Direction>("forward");
   const [focused, setFocused] = useState<number | null>(null);
   const [job, setJob] = useState<python.DownloadJob | null>(null);
+  const [maxPages, setMaxPages] = useState(10);
+  const [sort, setSort] = useState<SortKey>("relevance");
+  const [length, setLength] = useState<LengthKey>("any");
+  const [show, setShow] = useState<ShowKey>("all");
+  const settingsNow = useSettings();
+  const pageSize = settingsNow.find_music_page_size;
   const requestId = useRef(0);
+  const preview = usePreview();
 
-  const load = async (q: string, p: number) => {
+  const load = async (q: string, p: number, size = pageSize) => {
     const id = ++requestId.current;
     setLoading(true);
     setError("");
-    const r = await python.findMusicSearch(site, q, p);
+    const r = await python.findMusicSearch(site, q, p, size);
     if (id !== requestId.current) return; // a newer search started meanwhile
     setLoading(false);
     setResults(r.results);
     setPage(r.page);
+    setMaxPages(r.max_pages || 10);
     setHighestSeen((h) => Math.max(h, r.page));
     if (r.last_page) setLastPage(r.page);
     // A broken site or a bot check has its own warning at the top of the page
@@ -636,7 +768,20 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
     };
   }, [searched, page]);
 
-  const shown = pagesToShow(page, highestSeen, lastPage);
+  const changePageSize = (size: number) => {
+    updateSetting("find_music_page_size", size);
+    if (searched) {
+      setHighestSeen(1);
+      setLastPage(null);
+      setDirection("forward");
+      load(searched, 1, size);
+    }
+  };
+
+  // Sorting and filters work on the page that is shown
+  const visible = arrange(results, sort, length, show);
+
+  const shown = pagesToShow(page, highestSeen, lastPage, maxPages);
   const target = preselected(page, shown, direction);
 
   return (
@@ -673,6 +818,15 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
           Search
         </DialogButton>
       </Focusable>
+      {/* Options, compact: each one is a dropdown */}
+      {/* @ts-ignore */}
+      <Focusable flow-children="row" style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" }}>
+        <Option label="Per page" value={pageSize} options={PAGE_SIZE_OPTIONS} onChange={(v) => changePageSize(Number(v))} />
+        <Option label="Sort" value={sort} options={SORT_OPTIONS.filter((o) => o.data !== "views" || site === "youtube")} onChange={(v) => setSort(v as SortKey)} />
+        <Option label="Length" value={length} options={LENGTH_OPTIONS} onChange={(v) => setLength(v as LengthKey)} />
+        <Option label="Show" value={show} options={SHOW_OPTIONS} onChange={(v) => setShow(v as ShowKey)} />
+        {preview.error !== "" && <span style={{ fontSize: "12px", color: "#ff9b9b" }}>Preview: {preview.error}</span>}
+      </Focusable>
 
       {loading && <div style={{ opacity: 0.75, margin: "12px 0" }}>Searching...</div>}
       {!loading && error !== "" && <div style={{ color: "#ff9b9b", margin: "12px 0", fontSize: "13px" }}>Search failed: {error}</div>}
@@ -681,13 +835,19 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
       {!loading && results.length > 0 && (
         <>
           <Focusable style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-            {results.map((t) => (
+            {visible.map((t) => (
               <ResultCard
                 key={`${t.site}:${t.id}`}
                 track={t}
-                onDownload={() => showModal(<AddWindow track={t} onStarted={() => python.findMusicJob().then(setJob)} />)}
+                previewState={preview.stateOf(t)}
+                onPreview={() => preview.toggle(t)}
+                onDownload={() => {
+                  preview.stop();
+                  showModal(<AddWindow track={t} onStarted={() => python.findMusicJob().then(setJob)} />);
+                }}
               />
             ))}
+            {visible.length === 0 && <div style={{ opacity: 0.75 }}>Nothing on this page matches the Length and Show options.</div>}
           </Focusable>
           {/* The page numbers. Entering them selects the page most likely wanted next. */}
           <Focusable
@@ -697,7 +857,7 @@ const SearchArea: VFC<{ onStatusChange: () => void }> = ({ onStatusChange }) => 
             style={{ display: "flex", gap: "6px", justifyContent: "center", margin: "18px 0 6px" }}
           >
             {Array.from({ length: shown }, (_, i) => i + 1).map((n) => {
-              const egg = showsEasterEgg(n, page, shown, lastPage, direction) && focused === n;
+              const egg = showsEasterEgg(n, page, shown, lastPage, direction, maxPages) && focused === n;
               return (
                 <DialogButton
                   key={n}

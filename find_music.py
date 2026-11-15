@@ -22,7 +22,10 @@ import time
 import urllib.request
 
 PAGE_SIZE = 10
-MAX_PAGES = 10
+PAGE_SIZES = (5, 10, 20, 50)
+# At most this many results for one search (10 pages of 10, 2 pages of 50...)
+MAX_RESULTS = 100
+MAX_PAGES = MAX_RESULTS // PAGE_SIZE
 SEARCH_PREFIX = {"soundcloud": "scsearch", "youtube": "ytsearch"}
 SITE_NAMES = {"soundcloud": "SoundCloud", "youtube": "YouTube"}
 # Results longer than this are marked (hour-long mixes make huge packs)
@@ -180,22 +183,24 @@ def installed_sources(packs_dir):
 
 # ---------------------------------------------------------------- search
 
-def search(tools, site, query, page, packs_dir, timeout=120):
-    """One page of results: {"results": [...], "page", "last_page": bool, "error"?: text}."""
+def search(tools, site, query, page, packs_dir, timeout=120, page_size=PAGE_SIZE):
+    """One page of results: {"results": [...], "page", "last_page": bool, "max_pages", "error"?: text}."""
+    size = page_size if page_size in PAGE_SIZES else PAGE_SIZE
+    max_pages = MAX_RESULTS // size
     if site not in SEARCH_PREFIX:
-        return {"results": [], "page": page, "last_page": True, "error": "unknown site"}
+        return {"results": [], "page": page, "last_page": True, "max_pages": max_pages, "error": "unknown site"}
     query = (query or "").strip()
-    page = max(1, min(MAX_PAGES, int(page or 1)))
+    page = max(1, min(max_pages, int(page or 1)))
     if not query:
-        return {"results": [], "page": page, "last_page": True}
-    first = (page - 1) * PAGE_SIZE + 1
-    last = page * PAGE_SIZE
+        return {"results": [], "page": page, "last_page": True, "max_pages": max_pages}
+    first = (page - 1) * size + 1
+    last = page * size
     # YouTube's search list already has everything a card needs (and needs no JavaScript runtime);
     # SoundCloud's tracks are looked up one by one to get their details
     flat = ["--flat-playlist"] if site == "youtube" else []
     args = flat + ["--dump-json", "--skip-download", "--ignore-errors", "--no-warnings",
                    "--playlist-items", "{}-{}".format(first, last)] + site_args(tools, site) + [
-                   "{}{}:{}".format(SEARCH_PREFIX[site], MAX_PAGES * PAGE_SIZE, query)]
+                   "{}{}:{}".format(SEARCH_PREFIX[site], MAX_RESULTS, query)]
     result = tools.run_with_recovery(args, site, is_site_error, timeout=timeout)
     if result.returncode != 0 and is_bot_check(result.stderr or ""):
         tools.mark_blocked(site, (result.stderr or "").strip()[-300:])
@@ -231,7 +236,7 @@ def search(tools, site, query, page, packs_dir, timeout=120):
             "installed": installed.get(source_key(site, track_id), ""),
             "fill": fill(info, site),
         })
-    out = {"results": results, "page": page, "last_page": page >= MAX_PAGES or len(results) < PAGE_SIZE}
+    out = {"results": results, "page": page, "last_page": page >= max_pages or len(results) < size, "max_pages": max_pages}
     if not results and result.returncode != 0:
         st = tools.status()
         if st.get("blocked", {}).get(site):
@@ -242,6 +247,30 @@ def search(tools, site, query, page, packs_dir, timeout=120):
             lines = (result.stderr or "").strip().splitlines()
             out["error"] = lines[-1][:300] if lines else "search failed"
     return out
+
+
+# ---------------------------------------------------------------- preview
+
+def stream_url(tools, site, url, timeout=60):
+    """A direct link to the audio, to listen before downloading: {"ok", "url"} or {"ok": False, "error"}.
+    Only plain web links (no playlist streams), so the Steam screen can play it as it is."""
+    if site not in SEARCH_PREFIX or not url.startswith("https://"):
+        return {"ok": False, "error": "no link"}
+    if site == "youtube":
+        tools.ensure("deno")
+    args = ["-g", "--no-playlist", "--no-warnings", "-f",
+            "bestaudio[protocol^=http][ext=m4a]/bestaudio[protocol^=http]/bestaudio"] + site_args(tools, site) + [url]
+    result = tools.run_with_recovery(args, site, is_site_error, timeout=timeout)
+    if result.returncode != 0:
+        if is_bot_check(result.stderr or ""):
+            tools.mark_blocked(site, (result.stderr or "").strip()[-300:])
+            return {"ok": False, "error": "blocked"}
+        lines = (result.stderr or "").strip().splitlines()
+        return {"ok": False, "error": lines[-1][:300] if lines else "no preview"}
+    for line in (result.stdout or "").splitlines():
+        if line.strip().startswith("https://"):
+            return {"ok": True, "url": line.strip()}
+    return {"ok": False, "error": "no preview"}
 
 
 # ---------------------------------------------------------------- the pack

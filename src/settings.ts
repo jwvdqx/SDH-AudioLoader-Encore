@@ -49,6 +49,8 @@ export interface Settings {
   download_during_games: boolean;
   /** The music carries on where it was after games, sleep and restarts. */
   continuous_playback: boolean;
+  /** Find Music: results per page (5, 10, 20 or 50). */
+  find_music_page_size: number;
   ui_tab: string;
   ui_collapsed: Record<string, boolean>;
 }
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   media_keys: true,
   download_during_games: false,
   continuous_playback: false,
+  find_music_page_size: 10,
   ui_tab: "music",
   ui_collapsed: {},
 };
@@ -140,6 +143,7 @@ export function loadSettings(data: any): void {
   settings.media_keys = d.media_keys !== false;
   settings.download_during_games = d.download_during_games === true;
   settings.continuous_playback = d.continuous_playback === true;
+  settings.find_music_page_size = [5, 10, 20, 50].includes(Number(d.find_music_page_size)) ? Number(d.find_music_page_size) : 10;
   settings.ui_tab = typeof d.ui_tab === "string" ? d.ui_tab : DEFAULT_SETTINGS.ui_tab;
   const collapsed: Record<string, boolean> = {};
   if (d.ui_collapsed && typeof d.ui_collapsed === "object") {

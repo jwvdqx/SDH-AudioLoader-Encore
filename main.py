@@ -258,12 +258,12 @@ class Plugin:
 
     # ---- Find Music: search and download (see find_music.py)
 
-    async def find_music_search(self, site: str, query: str, page: int = 1) -> dict:
+    async def find_music_search(self, site: str, query: str, page: int = 1, page_size: int = 10) -> dict:
         tools = get_tools()
         if not tools.is_set_up():
             return {"results": [], "page": page, "last_page": True, "error": "not set up"}
         def work():
-            return find_music.search(tools, site, query, page, get_pack_path())
+            return find_music.search(tools, site, query, page, get_pack_path(), page_size=int(page_size or 10))
         try:
             return await asyncio.get_event_loop().run_in_executor(None, work)
         except Exception as e:
@@ -275,6 +275,15 @@ class Plugin:
             return {"ok": False, "error": "Find Music is not set up."}
         try:
             return get_downloads().start(site, str(track_id), url, dict(details or {}))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    async def find_music_stream(self, site: str, url: str) -> dict:
+        tools = get_tools()
+        if not tools.is_set_up():
+            return {"ok": False, "error": "not set up"}
+        try:
+            return await asyncio.get_event_loop().run_in_executor(None, lambda: find_music.stream_url(tools, site, url))
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

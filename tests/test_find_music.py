@@ -137,6 +137,26 @@ class Search(unittest.TestCase):
         tools = FakeTools(self.dir, rc=1, stderr="ERROR: no network here")
         self.assertEqual(fm.search(tools, "soundcloud", "x", 1, self.packs)["error"], "ERROR: no network here")
 
+    def test_results_per_page_can_be_chosen(self):
+        tools = FakeTools(self.dir, results=[track(i) for i in range(20)])
+        r = fm.search(tools, "soundcloud", "x", 2, self.packs, page_size=20)
+        self.assertIn("21-40", tools.calls[0])
+        self.assertEqual(r["max_pages"], 5)
+        self.assertFalse(r["last_page"])
+        r = fm.search(FakeTools(self.dir, results=[track(i) for i in range(50)]), "soundcloud", "x", 2, self.packs, page_size=50)
+        self.assertTrue(r["last_page"], "2 pages of 50 are the 100 results")
+        tools = FakeTools(self.dir, results=[])
+        fm.search(tools, "soundcloud", "x", 1, self.packs, page_size=7)
+        self.assertIn("1-10", tools.calls[0], "an unknown size falls back to 10")
+
+    def test_a_preview_gets_a_plain_web_link(self):
+        tools = FakeTools(self.dir)
+        tools.run_with_recovery = lambda args, site, err, timeout=60: types.SimpleNamespace(
+            returncode=0, stdout="https://cf-media.sndcdn.com/abc.mp3?x=1\n", stderr="")
+        r = fm.stream_url(tools, "soundcloud", "https://soundcloud.com/a/b")
+        self.assertEqual(r, {"ok": True, "url": "https://cf-media.sndcdn.com/abc.mp3?x=1"})
+        self.assertFalse(fm.stream_url(tools, "soundcloud", "file:///etc/passwd")["ok"])
+
     def test_an_empty_search_does_not_run_yt_dlp(self):
         tools = FakeTools(self.dir)
         fm.search(tools, "soundcloud", "   ", 1, self.packs)
