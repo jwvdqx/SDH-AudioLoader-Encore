@@ -55,6 +55,7 @@ import {
   skipMusic,
   sleepTimerEndsAt,
   startSleepTimer,
+  savePositionNow,
   PLACEHOLDER_COVER,
   steamAlbums,
 } from "../audioPlayers";
@@ -551,6 +552,15 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
           </Group>
 
           <Group id="music-playback" title="Playback">
+            <Toggle
+              label="Continuous Playback"
+              description="The music carries on where it left off: after a game, after the Deck sleeps, and after Steam restarts or the Deck is turned off and on. While this is on, it goes before New Music Every Day, Time of Day and the shuffle modes when the music starts again (they still pick what comes next when a song ends). Note: this relies on how Steam pauses, sleeps and restarts. A SteamOS, Steam or Decky update may change that; if it stops working, the music simply starts from the beginning."
+              checked={settings.continuous_playback}
+              onChange={(value) => {
+                updateSetting("continuous_playback", value);
+                if (value) savePositionNow(python.liveState().menuMusic, python.liveState().selectedMusic);
+              }}
+            />
             <Toggle
               label="Media Keys Control the Music"
               description="Play, Stop, Next and Prev keys pause, skip, or go back to the music before. Bind them to controller buttons in Steam Input: in a controller layout (for example Settings > Controller > Guide Button Chord Layout for Steam + a button), pick a button, then Keyboard > Numpad > Play / Stop / Next / Prev."

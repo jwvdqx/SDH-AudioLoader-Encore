@@ -54,7 +54,9 @@ export function changeMenuMusic(
   setGlobalState: (key: string, value: any) => void,
   gamesRunning: any,
   soundPacks: Pack[],
-  musicVolume: number
+  musicVolume: number,
+  /** Continuous Playback: carry on with this file of the pack, from this second */
+  resume?: { file: string; time: number } | null
 ) {
   menuMusicControl.pausedByOtherPlugin = false;
   // Choosing or restarting music on purpose ends a Sleep Timer pause (Battery Saver stays)
@@ -77,11 +79,12 @@ export function changeMenuMusic(
   if (newMusic !== "None" && gamesRunning.length === 0) {
     const currentPack = soundPacks.find((e) => e.name === newMusic);
 
-    const musicFileName = findMapping(
-      "menu_music.mp3",
-      currentPack?.mappings,
-      currentPack?.truncatedPackPath
-    );
+    // Continuous Playback: the same file as before, when the pack still has it
+    const mapped: string[] = ((currentPack?.mappings as any)?.["menu_music.mp3"] as string[]) || ["menu_music.mp3"];
+    const resumeFile = resume && mapped.includes(resume.file) ? resume.file : null;
+    const musicFileName = resumeFile
+      ? resumeFile
+      : findMapping("menu_music.mp3", currentPack?.mappings, currentPack?.truncatedPackPath);
     const musicFilePath = createFullPath(musicFileName, currentPack?.truncatedPackPath);
     const introFilePath = createFullPath(
       findMapping("intro_music.mp3", currentPack?.mappings, currentPack?.truncatedPackPath),
@@ -95,15 +98,18 @@ export function changeMenuMusic(
 
     // If there is an intro, it must play that, and add an onended listener to change to the normal music
     // If there's no intro, it can just go straight to playAndLoopMenuMusic()
-    if (currentPack?.hasIntro) {
+    if (currentPack?.hasIntro && !resumeFile) {
       function handleIntroEnd() {
         newMenuMusic.currentTime = 0;
         newMenuMusic.src = musicFilePath;
         newMenuMusic.onended = null;
+        (newMenuMusic as any).alIntro = false;
         playAndLoopMenuMusic();
       }
       newMenuMusic = new Audio(introFilePath);
       newMenuMusic.onended = handleIntroEnd;
+      // Continuous Playback does not remember a place inside the intro
+      (newMenuMusic as any).alIntro = true;
       (newMenuMusic as any).alGain = musicGain;
       applyMusicVolume(newMenuMusic, musicVolume);
       newMenuMusic.play().catch(reportPlayError);
@@ -111,12 +117,32 @@ export function changeMenuMusic(
     } else {
       newMenuMusic = new Audio(musicFilePath);
       (newMenuMusic as any).alGain = musicGain;
+      if (resumeFile && resume) {
+        // Jump to the remembered second once the file's length is known (not past its end)
+        const at = resume.time;
+        const el = newMenuMusic;
+        const jump = () => {
+          el.removeEventListener("loadedmetadata", jump);
+          const length = isFinite(el.duration) ? el.duration : 0;
+          if (at > 0 && (length === 0 || at < length - 2)) {
+            try {
+              el.currentTime = at;
+            } catch {
+              // starts from the beginning instead
+            }
+          }
+        };
+        el.addEventListener("loadedmetadata", jump);
+      }
       playAndLoopMenuMusic();
     }
 
-    // Optional Encore-only Now Playing toast (separate from the persistent Now Playing card).
-    announceMusic(currentPack);
-    rememberMusic(currentPack?.name);
+    // A resumed song is not a new play: no Now Playing message, no extra count
+    if (!resumeFile) {
+      // Optional Encore-only Now Playing toast (separate from the persistent Now Playing card).
+      announceMusic(currentPack);
+      rememberMusic(currentPack?.name);
+    }
     // "Smooth Fades": the new music rises from silence
     fadeInMusic(newMenuMusic);
 

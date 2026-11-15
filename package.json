@@ -5,7 +5,7 @@
   "scripts": {
     "build": "shx rm -rf dist && rollup -c",
     "watch": "rollup -c -w",
-    "test": "node --require ./tests/register.js --test tests/js/volume.test.js tests/js/music.test.js tests/js/save.test.js tests/js/nowPlaying.test.js tests/js/lowpass.test.js tests/js/pager.test.js && python3 tests/test_python.py && python3 tests/test_downloader.py && python3 tests/test_find_music.py"
+    "test": "node --require ./tests/register.js --test tests/js/volume.test.js tests/js/music.test.js tests/js/save.test.js tests/js/nowPlaying.test.js tests/js/lowpass.test.js tests/js/pager.test.js tests/js/continuous.test.js && python3 tests/test_python.py && python3 tests/test_downloader.py && python3 tests/test_find_music.py"
   },
   "repository": {
     "type": "git",

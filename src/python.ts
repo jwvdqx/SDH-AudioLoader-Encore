@@ -334,3 +334,15 @@ export function findMusicControl(action: "pause" | "resume" | "cancel" | "clear"
     .then((r) => (r.success ? r.result.job : null))
     .catch(() => null);
 }
+
+// ---- Continuous Playback (see audioPlayers/continuous.ts) ----
+
+export function savePosition(data: { music: string; file: string; time: number; at: number }): Promise<any> {
+  return Promise.resolve(server?.callPluginMethod("save_position", { data })).catch(() => null);
+}
+
+export function loadPosition(): Promise<any> {
+  return Promise.resolve(server?.callPluginMethod<{}, any>("load_position", {}))
+    .then((r: any) => (r && r.success ? r.result : null))
+    .catch(() => null);
+}
