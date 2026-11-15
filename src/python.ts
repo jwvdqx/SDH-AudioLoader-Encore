@@ -13,6 +13,16 @@ export function setStateClass(s: GlobalState): void {
   globalState = s;
 }
 
+/** Changes the global state (the same as setGlobalState of the state class). */
+export function setGlobal(key: string, value: any): void {
+  globalState?.setGlobalState(key, value);
+}
+
+/** The live state (not a page's copy from its last redraw): use it for anything that acts on the music player. */
+export function liveState(): any {
+  return globalState ? globalState.getPublicState() : {};
+}
+
 // The title and message can also be React elements (the "Now Playing" title scrolls this way)
 export function toast(title: any, message: any, duration: number = 8000) {
   // This is a weirdo self-invoking function, but it works.

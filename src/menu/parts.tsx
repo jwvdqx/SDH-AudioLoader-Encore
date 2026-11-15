@@ -36,10 +36,19 @@ export const FocusButton: VFC<{
   style: CSSProperties;
   onClick: () => void;
   children: ReactNode;
-}> = ({ style, onClick, children }) => {
+  disabled?: boolean;
+  /** Told when the controller or mouse comes onto the button and leaves it */
+  onFocusChange?: (focused: boolean) => void;
+}> = ({ style, onClick, children, disabled, onFocusChange }) => {
   const [focused, setFocused] = useState(false);
-  const on = () => setFocused(true);
-  const off = () => setFocused(false);
+  const on = () => {
+    setFocused(true);
+    onFocusChange?.(true);
+  };
+  const off = () => {
+    setFocused(false);
+    onFocusChange?.(false);
+  };
   const highlight: CSSProperties = focused
     ? {
         border: "2px solid #ffffff",
@@ -50,10 +59,11 @@ export const FocusButton: VFC<{
     : {};
   return (
     <DialogButton
-      style={{ transition: "all 0.12s ease", ...style, ...highlight }}
+      style={{ transition: "all 0.12s ease", ...style, ...highlight, ...(disabled ? { opacity: 0.45 } : {}) }}
       onClick={onClick}
-      // onFocus/onBlur (mouse and touch) reach the button but are missing from its type
-      {...({ onFocus: on, onBlur: off } as any)}
+      disabled={disabled}
+      // onFocus/onBlur (and the mouse) reach the button but are missing from its type
+      {...({ onFocus: on, onBlur: off, onMouseEnter: on, onMouseLeave: off } as any)}
       onGamepadFocus={on}
       onGamepadBlur={off}
     >

@@ -11,6 +11,9 @@ import {
 import { useEffect, useMemo, useState, VFC } from "react";
 import {
   FaBookOpen,
+  FaGlobe,
+  FaSearch,
+  FaThLarge,
   FaInfoCircle,
   FaMusic,
   FaPause,
@@ -231,14 +234,16 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
             <DialogButton
               style={{ flex: 1, minWidth: 0, padding: "6px" }}
               onClick={() => {
-                if (!menuMusic) return;
-                if (menuMusic.paused) {
+                // The live player (not this card's copy from its last redraw)
+                const player = state.getPublicState().menuMusic;
+                if (!player) return;
+                if (player.paused) {
                   menuMusicControl.pausedByOtherPlugin = false;
                   if (menuMusicControl.pausedByLimit === "sleepTimer") endSleepTimerPause(state);
-                  Promise.resolve(resumeMusicSmooth(menuMusic)).catch(() => {});
+                  Promise.resolve(resumeMusicSmooth(player)).catch(() => {});
                 } else {
                   menuMusicControl.pausedByOtherPlugin = true;
-                  pauseMusicSmooth(menuMusic);
+                  pauseMusicSmooth(player);
                 }
                 setTimeout(refresh, 900);
               }}
@@ -342,7 +347,6 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
     selectedMusic,
     soundPacks,
     menuMusic,
-    gamesRunning,
     musicVolume,
     dailyRandomMusic,
     dailyMusicDate,
@@ -378,8 +382,11 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
     [soundPacks]
   );
 
-  const restart = (newMusic: string) =>
-    changeMenuMusic(newMusic, menuMusic, (k, v) => setGlobalState(k, v), gamesRunning, soundPacks, musicVolume);
+  // The live player, not this tab's copy from its last redraw (that could leave two players playing)
+  const restart = (newMusic: string) => {
+    const live = python.liveState();
+    changeMenuMusic(newMusic, live.menuMusic, (k, v) => setGlobalState(k, v), live.gamesRunning, live.soundPacks, live.musicVolume);
+  };
 
   const saveBase = (extra: object) =>
     python.setConfig({
@@ -452,11 +459,12 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
               }}
             />
           </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "FindMusic")}>
-              Find New Music
-            </ButtonItem>
-          </PanelSectionRow>
+          <NavButton
+            icon={<FaBookOpen />}
+            title="Library"
+            subtitle="Your packs, Find Music and new packs"
+            onClick={() => openPackManager(setGlobalState, "MyPacks")}
+          />
           <Slider
             label="Music Volume"
             value={musicVolume}
@@ -751,6 +759,12 @@ const SoundsTab: VFC = () => {
           }}
         />
       </PanelSectionRow>
+      <NavButton
+        icon={<FaBookOpen />}
+        title="Library"
+        subtitle="Your sound packs and new ones"
+        onClick={() => openPackManager(setGlobalState, "MyPacks")}
+      />
       <Slider
         label="Sound Volume"
         value={soundVolume}
@@ -904,6 +918,39 @@ const EffectsTab: VFC = () => {
   );
 };
 
+// A big button in Encore's style (icon, title, a line of text), for the ways into the Pack Manager
+const NavButton: VFC<{ icon: JSX.Element; title: string; subtitle?: string; onClick: () => void }> = ({
+  icon,
+  title,
+  subtitle,
+  onClick,
+}) => (
+  <PanelSectionRow>
+    <FocusButton
+      onClick={onClick}
+      style={{
+        width: "100%",
+        minWidth: 0,
+        padding: "8px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        textAlign: "left",
+        borderRadius: "8px",
+        border: PANEL_BORDER,
+        background: "linear-gradient(135deg, rgba(88, 50, 140, 0.75), rgba(34, 28, 70, 0.75))",
+        color: "#ffffff",
+      }}
+    >
+      <span style={{ fontSize: "20px", color: ACCENT, display: "flex", flex: "0 0 auto" }}>{icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: "14px", lineHeight: 1.3 }}>{title}</div>
+        {subtitle && <div style={{ ...smallText, fontSize: "11px" }}>{subtitle}</div>}
+      </span>
+    </FocusButton>
+  </PanelSectionRow>
+);
+
 // Opens the Pack Manager on a page ("MyPacks", "BrowsePacks"...)
 const openPackManager = (setGlobalState: (k: string, v: any) => void, tab: string) => {
   setGlobalState("currentTab", tab);
@@ -926,23 +973,24 @@ const LibraryTab: VFC = () => {
         {" "}
         {settings.favorite_music.length} favorite{settings.favorite_music.length === 1 ? "" : "s"}, {settings.blocked_music.length} never picked.
       </Info>
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "MyPacks")}>
-          My Packs
-        </ButtonItem>
-      </PanelSectionRow>
-      <Note>All your packs as cards: play or use a pack, mark favorites, never pick, update, uninstall.</Note>
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "FindMusic")}>
-          Find Music
-        </ButtonItem>
-      </PanelSectionRow>
-      <Note>Search SoundCloud and YouTube and add a song as a music pack.</Note>
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "BrowsePacks")}>
-          Browse New Packs
-        </ButtonItem>
-      </PanelSectionRow>
+      <NavButton
+        icon={<FaThLarge />}
+        title="My Packs"
+        subtitle="Play, use, favorite, update and uninstall your packs"
+        onClick={() => openPackManager(setGlobalState, "MyPacks")}
+      />
+      <NavButton
+        icon={<FaSearch />}
+        title="Find Music"
+        subtitle="Add songs from SoundCloud and YouTube"
+        onClick={() => openPackManager(setGlobalState, "FindMusic")}
+      />
+      <NavButton
+        icon={<FaGlobe />}
+        title="Browse New Packs"
+        subtitle="Music and sound packs from deckthemes.com"
+        onClick={() => openPackManager(setGlobalState, "BrowsePacks")}
+      />
 
       <Group id="library-stats" title="Play Stats" defaultCollapsed>
         <Info>
