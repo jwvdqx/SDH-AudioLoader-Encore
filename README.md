@@ -1,4 +1,4 @@
-# Audio Loader Encore
+# SDH Audio Loader Encore
 
 > **Unofficial fork** of [DeckThemes/SDH-AudioLoader](https://github.com/DeckThemes/SDH-AudioLoader) by EMERALD0874 and Beebles. All the original work belongs to them. This fork is **not** supported by the DeckThemes team. Please do not ask them about problems with it; open an issue here instead.
 
