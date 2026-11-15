@@ -1,159 +1,58 @@
 import { DialogButton, Focusable, TextField } from "decky-frontend-lib";
-import { SiWebauthn } from "react-icons/si";
 import { useState, VFC } from "react";
 import { logInWithShortToken, logOut } from "../api";
 import { useGlobalState } from "../state";
 import { StoragePanel } from "./StoragePanel";
 
+// Settings of the Pack Manager: storage first, then the optional pack website account (only used to
+// star packs in Browse), then the credits.
+
+const heading = { fontWeight: 700, fontSize: "1.4em", margin: "18px 0 6px" } as const;
+const small = { fontSize: "12px", opacity: 0.75, lineHeight: 1.5 } as const;
+
 export const SettingsPage: VFC = () => {
   const { apiShortToken, apiFullToken, apiMeData } = useGlobalState();
-  const [shortTokenInterimValue, setShortTokenIntValue] =
-    useState<string>(apiShortToken);
+  const [token, setToken] = useState<string>(apiShortToken);
 
   return (
-    // The outermost div is to push the content down into the visible area
-    <div>
-      <div>
-        {apiFullToken ? (
-          <h1 style={{ fontWeight: "bold", fontSize: "2em" }}>Your Account</h1>
-        ) : (
-          <h1 style={{ fontSize: "1em", fontWeight: "normal" }}>
-            <span style={{ fontWeight: "bold", fontSize: "2em" }}>Log In</span>{" "}
-            - Create an account on deckthemes.com and generate a deck token on
-            your account page.
-          </h1>
-        )}
-        {apiFullToken ? (
-          <>
-            <Focusable style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ minWidth: "65%", marginRight: "auto" }}>
-                {apiMeData ? (
-                  <>
-                    <span>Logged In As {apiMeData.username}</span>
-                  </>
-                ) : (
-                  <span>Loading</span>
-                )}
-              </div>
-              <DialogButton
-                style={{
-                  maxWidth: "30%",
-                  height: "50%",
-                  marginLeft: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5em",
-                }}
-                onClick={logOut}
-              >
-                <span>Unlink My Deck</span>
-              </DialogButton>
-            </Focusable>
-          </>
-        ) : (
-          <>
-            <Focusable
-              style={{ display: "flex", alignItems: "center", width: "100%" }}
-            >
-              <div style={{ minWidth: "65%", marginRight: "auto" }}>
-                <TextField
-                  disabled={!!apiFullToken}
-                  label="DeckThemes Account Key"
-                  bIsPassword
-                  value={shortTokenInterimValue}
-                  onChange={(e) => setShortTokenIntValue(e.target.value)}
-                />
-              </div>
-              <DialogButton
-                disabled={shortTokenInterimValue.length !== 12}
-                onClick={() => {
-                  logInWithShortToken(shortTokenInterimValue);
-                }}
-                style={{
-                  maxWidth: "30%",
-                  height: "50%",
-                  marginLeft: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5em",
-                }}
-              >
-                <SiWebauthn style={{ height: "1.5em", width: "1.5em" }} />
-                <span>Log In</span>
-              </DialogButton>
-            </Focusable>
-          </>
-        )}
-      </div>
-      <Focusable>
-        <div>
-          <h1
-            style={{ fontWeight: "bold", fontSize: "2em", marginBottom: "0px" }}
-          >
-            About AudioLoader
-          </h1>
-          <div style={{ display: "flex", gap: "4em", fontSize: "0.9em" }}>
-            <div>
-              <h2
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "1.5em",
-                  marginBottom: "0px",
-                }}
-              >
-                Developers
-              </h2>
-              <ul style={{ marginTop: "0px", marginBottom: "0px" }}>
-                <li>
-                  <span>SuchMeme - github.com/suchmememanyskill</span>
-                </li>
-                <li>
-                  <span>EMERALD - github.com/EMERALD0874</span>
-                </li>
-                <li>
-                  <span>Beebles - github.com/beebls</span>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h2
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "1.5em",
-                  marginBottom: "0px",
-                }}
-              >
-                Support
-              </h2>
-              <span>
-                See the DeckThemes Discord server for support.
-                <br />
-                deckthemes.com/discord
-              </span>
-            </div>
-            <div>
-              <h2
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "1.5em",
-                  marginBottom: "0px",
-                }}
-              >
-                Create and Submit Your Own Packs
-              </h2>
-              <span>
-                Instructions for theme creation/submission are available on
-                DeckThemes' docs website.
-                <br />
-                docs.deckthemes.com
-              </span>
-            </div>
-          </div>
-        </div>
-      </Focusable>
+    <div style={{ padding: "0 2.8vw 2em" }}>
       <StoragePanel />
+
+      <div style={heading}>Pack Website Account (optional)</div>
+      <div style={small}>
+        Only needed to star packs on deckthemes.com from the Browse page. Create an account there and generate a deck token on
+        your account page.
+      </div>
+      <Focusable style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "8px" }}>
+        {apiFullToken ? (
+          <>
+            <div style={{ flex: 1 }}>{apiMeData ? `Logged in as ${apiMeData.username}` : "Loading..."}</div>
+            <DialogButton style={{ width: "auto", minWidth: "160px" }} onClick={logOut}>
+              Unlink My Deck
+            </DialogButton>
+          </>
+        ) : (
+          <>
+            <div style={{ flex: 1 }}>
+              <TextField label="DeckThemes Account Key" bIsPassword value={token} onChange={(e) => setToken(e.target.value)} />
+            </div>
+            <DialogButton
+              style={{ width: "auto", minWidth: "160px" }}
+              disabled={token.length !== 12}
+              onClick={() => logInWithShortToken(token)}
+            >
+              Log In
+            </DialogButton>
+          </>
+        )}
+      </Focusable>
+
+      <div style={heading}>About</div>
+      <div style={small}>
+        Audio Loader Encore, an unofficial fork of Audio Loader by SuchMeme (github.com/suchmememanyskill), EMERALD
+        (github.com/EMERALD0874) and Beebles (github.com/beebls). Encore changes by jwvdqx. Pack creation guide:
+        docs.deckthemes.com. Packs are from deckthemes.com.
+      </div>
     </div>
   );
 };

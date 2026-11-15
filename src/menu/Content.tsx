@@ -452,6 +452,11 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
               }}
             />
           </PanelSectionRow>
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "FindMusic")}>
+              Find New Music
+            </ButtonItem>
+          </PanelSectionRow>
           <Slider
             label="Music Volume"
             value={musicVolume}
@@ -927,6 +932,12 @@ const LibraryTab: VFC = () => {
         </ButtonItem>
       </PanelSectionRow>
       <Note>All your packs as cards: play or use a pack, mark favorites, never pick, update, uninstall.</Note>
+      <PanelSectionRow>
+        <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "FindMusic")}>
+          Find Music
+        </ButtonItem>
+      </PanelSectionRow>
+      <Note>Search SoundCloud and YouTube and add a song as a music pack.</Note>
       <PanelSectionRow>
         <ButtonItem layout="below" onClick={() => openPackManager(setGlobalState, "BrowsePacks")}>
           Browse New Packs
