@@ -1,7 +1,8 @@
 import { GlobalState } from "../state/GlobalState";
 import { settings, notifySettingsChanged } from "../settings";
 import { menuMusicControl } from "./changeMenuMusic";
-import { duckForNewDevice, pauseMusicSmooth, resumeMusicSmooth } from "./fade";
+import { duckForNewDevice, pauseMusicSmooth } from "./fade";
+import { resumeMusic } from "./resume";
 import { note } from "./stats";
 
 // Battery Saver and the Sleep Timer: both pause the menu music on purpose, and resume it later.
@@ -42,10 +43,10 @@ function pauseFor(state: GlobalState, reason: "battery" | "sleepTimer") {
 function resumeFrom(state: GlobalState, reason: "battery" | "sleepTimer") {
   if (menuMusicControl.pausedByLimit !== reason) return;
   menuMusicControl.pausedByLimit = null;
-  const s = state.getPublicState();
   note(reason === "battery" ? "Music resumed: battery is fine again" : "Music resumed after the Sleep Timer");
-  if (musicIsWanted(state) && s.menuMusic && !menuMusicControl.pausedByOtherPlugin) {
-    Promise.resolve(resumeMusicSmooth(s.menuMusic)).catch(() => {});
+  if (musicIsWanted(state) && !menuMusicControl.pausedByOtherPlugin) {
+    // Carries on where it was, and checks that it is heard (see resume.ts)
+    void resumeMusic(state, reason === "battery" ? "battery" : "sleep timer");
   }
   notifySettingsChanged();
 }

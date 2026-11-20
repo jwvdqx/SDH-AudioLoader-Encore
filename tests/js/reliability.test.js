@@ -110,3 +110,29 @@ test("lower the music for notifications: off means off", async () => {
   fade.stopFx();
   loadSettings({});
 });
+
+// ---- Resume: where to carry on (resume.ts) ----
+const { placeToResume } = require("../../src/audioPlayers/resume.ts");
+const player = (music, file, time, extra = {}) => ({ alMusic: music, src: `/sounds_custom/p/${file}`, currentTime: time, ...extra });
+
+test("resume carries on where the player was", () => {
+  assert.deepEqual(placeToResume(player("A", "song.mp3", 73.5), "A", null, false), { file: "song.mp3", time: 73.5 });
+});
+
+test("a player the Deck reset to 0 does not replace a good remembered place", () => {
+  const remembered = { music: "A", file: "song.mp3", time: 120, at: 1 };
+  assert.deepEqual(placeToResume(player("A", "song.mp3", 0), "A", remembered, true), { file: "song.mp3", time: 120 });
+});
+
+test("the place of another pack's player is never carried over", () => {
+  assert.equal(placeToResume(player("B", "menu_music.mp3", 50), "A", null, false), null);
+  const remembered = { music: "A", file: "a.mp3", time: 30, at: 1 };
+  assert.deepEqual(placeToResume(player("B", "menu_music.mp3", 50), "A", remembered, true), { file: "a.mp3", time: 30 });
+});
+
+test("no place inside an intro, and without a player only Continuous Playback remembers", () => {
+  assert.equal(placeToResume(player("A", "intro.mp3", 5, { alIntro: true }), "A", null, false), null);
+  const remembered = { music: "A", file: "a.mp3", time: 30, at: 1 };
+  assert.equal(placeToResume(null, "A", remembered, false), null);
+  assert.deepEqual(placeToResume(null, "A", remembered, true), { file: "a.mp3", time: 30 });
+});

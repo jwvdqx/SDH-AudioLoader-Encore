@@ -4,7 +4,8 @@ import { settings } from "../settings";
 import { GlobalState } from "../state/GlobalState";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
 import { recentMusic } from "./dailyMusic";
-import { pauseMusicSmooth, resumeMusicSmooth } from "./fade";
+import { pauseMusicSmooth } from "./fade";
+import { resumeMusic } from "./resume";
 import { endSleepTimerPause } from "./limits";
 import { skipMusic } from "./musicGuard";
 
@@ -78,16 +79,15 @@ export function startMediaKeys(state: GlobalState): () => void {
       changeMenuMusic(back, s.menuMusic, state.setGlobalState.bind(state), s.gamesRunning, s.soundPacks, s.musicVolume);
     } else {
       const el = s.menuMusic;
-      if (!el) return;
-      const wantPlay = action === "play" || (action === "playpause" && el.paused);
+      const stopped = !el || el.paused || el.ended;
+      const wantPlay = action === "play" || (action === "playpause" && stopped);
       if (wantPlay) {
         // Already playing: nothing to do (an explicit "play" must not pause the music)
-        if (!el.paused) return;
-        menuMusicControl.pausedByOtherPlugin = false;
-        menuMusicControl.pausedByMediaSession = false;
+        if (!stopped) return;
         if (menuMusicControl.pausedByLimit === "sleepTimer") endSleepTimerPause(state);
-        Promise.resolve(resumeMusicSmooth(el)).catch(() => {});
-      } else if (!el.paused) {
+        // Carries on where it was, and checks that it is heard (see resume.ts)
+        void resumeMusic(state, "media key");
+      } else if (el && !el.paused) {
         // Paused on purpose: the music guard must not start it again. A pause that came through the
         // browser's media session may be the system's own (it can send one while the Deck goes to
         // sleep), so waking up does not count it as a decision (see musicGuard.ts).

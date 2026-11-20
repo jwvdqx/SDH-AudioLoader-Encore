@@ -1,7 +1,9 @@
 import { GlobalState } from "../state/GlobalState";
 import * as python from "../python";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
-import { continuousOn, resumeFor, savePositionNow } from "./continuous";
+import { continuousOn, savePositionNow } from "./continuous";
+import { resumeMusic } from "./resume";
+import { ensureLiveContext } from "./musicGraph";
 import { getTodayKey, markTimeOfDayPlayed, pickReplayMusic, pickTodaysMusic, timeOfDayDue, timeOfDayPack } from "./dailyMusic";
 import { endSleepTimerPause } from "./limits";
 import { invalidateQueue, takeQueued, takeSkip } from "./playQueue";
@@ -10,7 +12,7 @@ import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v2.0.1";
+export const BUILD_TAG = "v2.0.2";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -27,15 +29,6 @@ const BIG_GAP_MS = 6000;
 const WAKE_COOLDOWN_MS = 10000;
 // After waking, give Steam and the sound system time to come back before restarting the music
 const WAKE_DELAY_MS = 5000;
-// How long to wait before checking whether a player really plays
-const CHECK_MS = 3000;
-// How long play() may take to answer. After sleep it can stay unanswered forever, which would keep
-// the guard busy (and so switched off) until Steam restarts.
-const PLAY_TIMEOUT_MS = 4000;
-// Pause between failed attempts
-const RETRY_GAP_MS = 5000;
-// How many times to build a new player before giving up
-const MAX_REBUILDS = 3;
 // The music should play all the time. If it does not for this many ticks in a row, restart it.
 const SILENT_TICKS = 4;
 // Never restart silent music more than this many times within 10 minutes (a wake-up is exempt)
@@ -160,13 +153,11 @@ function watchForReplay(state: GlobalState, el: any) {
   });
 }
 
-const isPlaying = (el: any) => !!el && !el.paused && !el.ended && el.currentTime > 0;
-
 // Gets the music playing again.
-// - "wake": the Deck just woke up. A player that looks fine can still be silent after sleep, so
-//   a brand new player is always built (with Continuous Playback it carries on from the remembered place).
-// - "silent": the music should be playing but is not. First try plain "play", and build a new
-//   player if that does not work.
+// - "wake": the Deck just woke up. A player that looks fine can still be silent after sleep, so a new
+//   player is built (carrying on from where the music was), and the audio chain is checked.
+// - "silent": the music should be playing but is not. The same player is tried first.
+// Both go through resumeMusic (resume.ts), which checks that the music is really heard.
 export async function restoreMusic(state: GlobalState, reason: Reason): Promise<void> {
   busy = true;
   try {
@@ -268,64 +259,12 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
       return;
     }
 
-    // Step 1: if the player still exists, just press play and see if it moves (silent music only).
-    // After waking it is not used: a player whose sound output died can still move its clock.
-    const old = s.menuMusic;
-    if (reason === "silent" && old && !old.error && s.selectedMusic === musicToPlay) {
-      const before = old.currentTime;
-      try {
-        // Never wait for play() forever
-        await Promise.race([old.play(), wait(PLAY_TIMEOUT_MS)]);
-      } catch {
-        // play() was refused, step 2 will build a new player
-      }
-      await wait(CHECK_MS);
-      if (isPlaying(old) && old.currentTime !== before) {
-        say("Music is playing again.");
-        return;
-      }
-    }
-
-    // Step 2: build a brand new player, and check that it really plays
-    for (let attempt = 0; attempt < MAX_REBUILDS; attempt++) {
-      s = state.getPublicState();
-      // Stop if the user (or a game) changed something while we were waiting
-      if (
-        !s.legacyEnabled ||
-        s.gamesRunning.length > 0 ||
-        s.selectedMusic !== musicToPlay ||
-        menuMusicControl.pausedByOtherPlugin
-      ) {
-        python.logEvent("Stopped restarting: something changed while waiting");
-        return;
-      }
-
-      changeMenuMusic(
-        musicToPlay,
-        s.menuMusic,
-        setGlobalState,
-        s.gamesRunning,
-        s.soundPacks,
-        s.musicVolume,
-        continuing ? resumeFor(musicToPlay) : null,
-        // the music stopped at the very end of a song: in a shuffle mode the next music takes over
-        () => {
-          playRandomMusic(state);
-        }
-      );
-
-      await wait(CHECK_MS);
-      if (!isPlaying(state.getPublicState().menuMusic)) {
-        // One more short look, a player that just changed track can briefly show time 0
-        await wait(1000);
-      }
-      if (isPlaying(state.getPublicState().menuMusic)) {
-        say(attempt === 0 ? "Music restarted." : `Music restarted (try ${attempt + 1}).`);
-        return;
-      }
-      if (attempt < MAX_REBUILDS - 1) await wait(RETRY_GAP_MS);
-    }
-    say(`Could not get the music playing again, even after ${MAX_REBUILDS} tries.`);
+    // Resume (or start the newly picked music): finds the place, checks the audio chain and replaces it
+    // when it died, and checks that the music is really heard (see resume.ts)
+    const ok = await resumeMusic(state, reason, musicToPlay, () => {
+      playRandomMusic(state);
+    });
+    say(ok ? "Music is playing again." : "Could not get the music playing again.");
   } finally {
     busy = false;
   }
@@ -461,8 +400,39 @@ export function startMusicGuard(state: GlobalState): () => void {
 
   python.logEvent(`Music guard started (${BUILD_TAG})`);
 
+  // A new or removed audio device (headphones, Bluetooth, a dock) can leave Encore's audio chain without
+  // a working output. A moment after Steam reports it, the chain is checked; when it had to be replaced,
+  // the music carries on from where it was.
+  const deviceHooks: { unregister?: () => void }[] = [];
+  const onDeviceChange = () => {
+    setTimeout(async () => {
+      const s = state.getPublicState();
+      if (!s.legacyEnabled || s.gamesRunning.length > 0 || s.selectedMusic === "None") return;
+      if (menuMusicControl.pausedByOtherPlugin || menuMusicControl.pausedByLimit !== null) return;
+      if ((await ensureLiveContext()) === "reset") {
+        note("The audio device changed and the music's audio chain had stopped: resuming");
+        trigger("silent");
+      }
+    }, 2000);
+  };
+  try {
+    const audio = (SteamClient as any)?.System?.Audio;
+    for (const name of ["RegisterForDeviceAdded", "RegisterForDeviceRemoved"]) {
+      if (typeof audio?.[name] === "function") deviceHooks.push(audio[name](onDeviceChange));
+    }
+  } catch {
+    python.logEvent("Steam's audio device events are not available in this Steam version");
+  }
+
   return () => {
     clearInterval(timer);
+    for (const h of deviceHooks) {
+      try {
+        h?.unregister?.();
+      } catch {
+        // nothing to clean up
+      }
+    }
     try {
       steamHook?.unregister();
     } catch {

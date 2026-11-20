@@ -28,7 +28,7 @@ import {
   pickTodaysMusic,
   playRandomMusic,
   refreshEffectVolume,
-  resumeMusicSmooth,
+  resumeMusic,
   setEffectVolumeApplier,
   startMusicGuard,
   startMusicLimits,
@@ -422,8 +422,11 @@ export default definePlugin((serverApi: ServerAPI) => {
             // (not with Continuous Playback: then the same music carries on)
             if (!continuousOn() && playRandomMusic(state)) {
               // new music started
-            } else if (menuMusic !== null && menuMusicControl.pausedByLimit === null) {
-              Promise.resolve(resumeMusicSmooth(menuMusic)).catch(() => {});
+            } else if (menuMusicControl.pausedByLimit === null) {
+              // Carries on where it was, and checks that it is heard (see resume.ts)
+              void resumeMusic(state, "game", undefined, () => {
+                playRandomMusic(state);
+              });
             }
           }
         }

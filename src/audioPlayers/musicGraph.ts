@@ -70,6 +70,78 @@ export function glide(graph: MusicGraph, param: AudioParam, value: number, secon
   }
 }
 
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** A promise that gives up after ms (after sleep, the audio system can leave a promise unanswered forever). */
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([p.catch(() => undefined), wait(ms).then(() => undefined)]);
+}
+
+/**
+ * Is the audio chain really running? Its clock only moves while the sound output takes samples, so a
+ * chain whose output died (after sleep, or when the audio device changed) has a still clock, even
+ * when it says "running". null: there is no chain.
+ */
+export async function audioClockMoves(ms = 400): Promise<boolean | null> {
+  const context = sharedContext;
+  if (!context || context.state === "closed") return null;
+  const before = context.currentTime;
+  const start = Date.now();
+  await wait(ms);
+  const wall = (Date.now() - start) / 1000;
+  return context.currentTime - before >= wall * 0.3;
+}
+
+/**
+ * Throws a dead audio chain away: every player connected to it can never be heard again, so they are
+ * cut loose and must be replaced by new players (see resume.ts). The next player gets a fresh chain.
+ */
+export function resetMusicContext(reason: string): void {
+  const old = sharedContext;
+  for (const graph of Array.from(graphs.values())) {
+    // a player that belonged to the dead chain is never connected again
+    refused.add(graph.element);
+    disconnect(graph);
+  }
+  graphs.clear();
+  sharedContext = null;
+  lastFailAt = 0;
+  if (old) {
+    try {
+      Promise.resolve(old.close()).catch(() => {});
+    } catch {
+      // already closed
+    }
+  }
+  python.logEvent(`Music audio chain: replaced with a new one (${reason})`);
+}
+
+/**
+ * Makes sure the audio chain can be heard: wakes it if it was suspended, and replaces it when its
+ * clock still does not move. "none": there is no chain (the music plays directly). "ok": it runs.
+ * "reset": it was dead and was thrown away (its players must be replaced).
+ */
+export async function ensureLiveContext(): Promise<"none" | "ok" | "reset"> {
+  const context = sharedContext;
+  if (!context || context.state === "closed") return "none";
+  if (context.state !== "running") await withTimeout(context.resume(), 1500);
+  if (await audioClockMoves(400)) return "ok";
+  resetMusicContext(`its clock stood still, state "${context.state}"`);
+  return "reset";
+}
+
+// Last resort: play the music without the audio chain until the plugin restarts (Normalize Music
+// Volume and Muffled Music then pause), when even a fresh chain stays silent.
+let bypass = false;
+export function bypassMusicGraph(reason: string): void {
+  if (bypass) return;
+  bypass = true;
+  python.logEvent(`Music audio chain: switched off until Encore restarts (${reason}); the music plays directly`);
+}
+export function musicGraphBypassed(): boolean {
+  return bypass;
+}
+
 export function resumeMusicContext(): void {
   const context = sharedContext;
   if (!context || context.state === "running" || context.state === "closed") return;
@@ -85,7 +157,7 @@ export async function requestMusicGraph(element: HTMLAudioElement | null): Promi
   if (!element) return null;
   const existing = graphs.get(element);
   if (existing) return existing;
-  if (attaching.has(element) || refused.has(element)) return null;
+  if (attaching.has(element) || refused.has(element) || bypass) return null;
   if (Date.now() - lastFailAt < RETRY_MS) return null;
   const AudioContextConstructor = (window as any).AudioContext;
   if (typeof AudioContextConstructor !== "function") {
@@ -97,14 +169,17 @@ export async function requestMusicGraph(element: HTMLAudioElement | null): Promi
   }
   attaching.add(element);
   try {
+    // A chain that exists must still be alive: a new player connected to a dead one is never heard
+    if (sharedContext && sharedContext.state !== "closed" && (await audioClockMoves(300)) === false) {
+      if (sharedContext.state !== "running") await withTimeout(sharedContext.resume(), 1500);
+      if ((await audioClockMoves(300)) === false) resetMusicContext("its clock stood still when a new player came");
+    }
+    if (sharedContext && sharedContext.state === "closed") sharedContext = null;
     const context: AudioContext = sharedContext || new AudioContextConstructor();
     sharedContext = context;
     if (context.state !== "running") {
-      try {
-        await context.resume();
-      } catch {
-        // checked right below
-      }
+      // never wait forever: after sleep this promise can stay unanswered
+      await withTimeout(context.resume(), 1500);
     }
     if (context.state !== "running") {
       lastFailAt = Date.now();

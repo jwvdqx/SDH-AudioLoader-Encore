@@ -49,7 +49,7 @@ import {
   playStats,
   previewMusicLowPass,
   refreshEffectVolume,
-  resumeMusicSmooth,
+  resumeMusic,
   setPlayMode,
   shortCredits,
   skipMusic,
@@ -237,11 +237,10 @@ const NowPlayingCard: VFC<{ state: GlobalState }> = ({ state }) => {
               onClick={() => {
                 // The live player (not this card's copy from its last redraw)
                 const player = state.getPublicState().menuMusic;
-                if (!player) return;
-                if (player.paused) {
-                  menuMusicControl.pausedByOtherPlugin = false;
+                if (!player || player.paused || player.ended) {
                   if (menuMusicControl.pausedByLimit === "sleepTimer") endSleepTimerPause(state);
-                  Promise.resolve(resumeMusicSmooth(player)).catch(() => {});
+                  // Carries on where it was, and checks that it is heard (see resume.ts)
+                  void resumeMusic(state, "button");
                 } else {
                   menuMusicControl.pausedByOtherPlugin = true;
                   pauseMusicSmooth(player);

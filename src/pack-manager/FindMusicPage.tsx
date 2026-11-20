@@ -4,7 +4,7 @@ import { FaCheck, FaClock, FaDownload, FaExclamationTriangle, FaLock, FaPlay, Fa
 import { Dropdown } from "decky-frontend-lib";
 import { EncoreButton, FocusButton } from "../menu/parts";
 import { chip, smallButton } from "../components/look";
-import { menuMusicControl, pauseMusicSmooth, resumeMusicSmooth } from "../audioPlayers";
+import { menuMusicControl, pauseMusicSmooth, resumeMusic as resumeMusicNow } from "../audioPlayers";
 import { Pack } from "../classes";
 import { PackCard } from "./MyPacksPage";
 import { arrange, LENGTH_OPTIONS, LengthKey, PAGE_SIZE_OPTIONS, SHOW_OPTIONS, ShowKey, SORT_OPTIONS, SortKey } from "./findOptions";
@@ -606,9 +606,10 @@ function usePreview() {
     if (!resumeMusic) return;
     const music = pausedMusic.current;
     pausedMusic.current = null;
-    if (music) {
-      menuMusicControl.pausedByOtherPlugin = false;
-      Promise.resolve(resumeMusicSmooth(music)).catch(() => {});
+    const state = python.stateClass();
+    if (music && state) {
+      // Carries on where it was, and checks that it is heard (see resume.ts)
+      void resumeMusicNow(state, "preview ended");
     }
   };
 

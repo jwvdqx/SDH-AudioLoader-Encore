@@ -148,6 +148,9 @@ export function changeMenuMusic(
       playAndLoopMenuMusic();
     }
 
+    // Which music this player belongs to (a resume never carries a place over to another pack)
+    (newMenuMusic as any).alMusic = newMusic;
+
     // A resumed song is not a new play: no Now Playing message, no extra count
     if (!resumeFile) {
       // Optional Encore-only Now Playing toast (separate from the persistent Now Playing card).
