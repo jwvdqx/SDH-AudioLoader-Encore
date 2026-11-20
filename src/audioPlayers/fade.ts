@@ -1,6 +1,7 @@
 import { settings } from "../settings";
 import { applyMusicVolume, musicFx } from "./loudness";
 import { musicGraphFor } from "./musicGraph";
+import { NOTIFICATION_HOLD_MS, NOTIFICATION_SOUNDS, ownToastSoundExpected } from "./notificationSounds";
 
 // Smooth fades and "ducking" (a short volume dip) for the menu music.
 // Both work through factors on the player's volume (see applyMusicVolume), so they never fight
@@ -10,13 +11,7 @@ const FADE_IN_MS = 1500;
 const FADE_OUT_MS = 700;
 const STEP_MS = 50;
 
-const NOTIFICATION_SOUNDS = new Set([
-  "deck_ui_toast.wav",
-  "deck_ui_message_toast.wav",
-  "deck_ui_achievement_toast.wav",
-]);
 const DUCK_LEVEL = 0.35;
-const NOTIFICATION_HOLD_MS = 2200;
 const DEVICE_DUCK_LEVEL = 0.3;
 const DEVICE_HOLD_MS = 2500;
 // Without "Smooth Fades", a player in the music chain still gets a very short fade before it stops,
@@ -185,6 +180,8 @@ export function duckMusic(level: number, holdMs: number): void {
 export function maybeDuckForSound(soundName: string): void {
   if (!settings.duck_notifications) return;
   if (!NOTIFICATION_SOUNDS.has(soundName)) return;
+  // Encore's own "Now Playing" notification would otherwise dip every new song right at its start
+  if (ownToastSoundExpected()) return;
   duckMusic(DUCK_LEVEL, NOTIFICATION_HOLD_MS);
 }
 

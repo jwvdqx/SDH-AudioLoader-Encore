@@ -155,6 +155,19 @@ test("skip Now Playing: switched off, the notification muffles as before", async
   loadSettings({});
 });
 
+// ---- 2.0.1: the chat and friends sounds are notifications too ----
+
+test("pop-ups: the chat and friends sounds (.m4a) muffle the music like the toasts do", async () => {
+  lp.configureMusicLowPass({ ...base, popups: true });
+  for (const name of ["steam_chatroom_notification.m4a", "steam_at_mention.m4a", "ui_steam_smoother_friend_online.m4a"]) {
+    lp.lowPassForSound(name);
+    assert.equal(lp.shouldFilter(), true, name);
+    await tick(4000);
+    assert.equal(lp.shouldFilter(), false, `${name} ends by itself`);
+  }
+  lp.configureMusicLowPass(base);
+});
+
 // ---- 1.7: the watcher does less while the music is not playing ----
 test("while the music is paused, Steam's menu state is read only every 2 seconds", async () => {
   let reads = 0;
@@ -197,4 +210,100 @@ test("with every toggle off, Steam's menu state is not read at all", async () =>
   assert.equal(reads, 0);
   lp.setMusicLowPassPlayer(null);
   window.SteamUIStore = oldStore;
+});
+
+// ---- 2.0.3: all menus, the volume indicator, Big Picture windows ----
+
+test("the focused tree is sorted into main screen, keyboard or a menu on top", () => {
+  assert.equal(lp.classifyFocusedTree("root_1_"), "main");
+  assert.equal(lp.classifyFocusedTree("VirtualKeyboard_3"), "keyboard");
+  assert.equal(lp.classifyFocusedTree("ContextMenu_power"), "other");
+  assert.equal(lp.classifyFocusedTree(undefined), null);
+});
+
+// A fake piece of Steam's screen: elements that know their parent, and a document with a focused element
+function fakeScreen() {
+  const doc = { activeElement: null, hasFocus: () => true };
+  const el = (parent) => {
+    const e = { parentElement: parent, ownerDocument: doc, getBoundingClientRect: () => ({ width: 100, height: 100 }) };
+    e.contains = (x) => { for (let n = x; n; n = n.parentElement) if (n === e) return true; return false; };
+    return e;
+  };
+  const body = el(null);
+  const main = el(body);
+  const page = el(main); // a page inside the main screen, with a tree of its own
+  const powerMenu = el(body); // drawn on top, outside the main screen
+  const keyboard = el(body);
+  const trees = [
+    { m_ID: "root_1_", Root: { Element: main } },
+    { m_ID: "LibraryPage", Root: { Element: page } },
+    { m_ID: "PowerMenu", Root: { Element: powerMenu } },
+    { m_ID: "VirtualKeyboard", Root: { Element: keyboard } },
+  ];
+  return { doc, main, page, powerMenu, keyboard, trees };
+}
+
+test("All menus: the power menu muffles; pages of the main screen and the keyboard do not", async () => {
+  const sc = fakeScreen();
+  global.window = global.window || {};
+  const oldNav = window.FocusNavController;
+  window.FocusNavController = { m_ActiveContext: { m_rgGamepadNavigationTrees: sc.trees } };
+  const oldStore = window.SteamUIStore;
+  window.SteamUIStore = { WindowStore: { GamepadUIMainWindowInstance: { MenuStore: { GetOpenSideMenu: () => 0 } } } };
+  lp.setMusicLowPassPlayer({ paused: false, ended: false, volume: 1 });
+  lp.configureMusicLowPass({ ...base, otherMenus: true });
+
+  sc.doc.activeElement = sc.page;
+  await tick(300);
+  assert.equal(lp.shouldFilter(), false, "a page of the main screen is not a menu");
+  sc.doc.activeElement = sc.powerMenu;
+  await tick(300);
+  assert.equal(lp.shouldFilter(), true, "the power menu muffles the music");
+  sc.doc.activeElement = sc.keyboard;
+  await tick(300);
+  assert.equal(lp.shouldFilter(), false, "the on-screen keyboard does not");
+  // the volume indicator never counts as a menu
+  sc.doc.activeElement = sc.powerMenu;
+  lp.lowPassForSound("deck_ui_volume.wav");
+  await tick(300);
+  assert.equal(lp.shouldFilter(), false, "while the volume changes, nothing on top counts (Volume Changes is off)");
+  await tick(2000);
+  assert.equal(lp.shouldFilter(), true);
+  sc.doc.activeElement = sc.main;
+  await tick(300);
+  assert.equal(lp.shouldFilter(), false);
+
+  lp.configureMusicLowPass(base);
+  lp.setMusicLowPassPlayer(null);
+  window.FocusNavController = oldNav;
+  window.SteamUIStore = oldStore;
+});
+
+test("the side menus are also read from Big Picture's window (Desktop Mode)", () => {
+  global.window = global.window || {};
+  const oldStore = window.SteamUIStore;
+  window.SteamUIStore = {
+    WindowStore: {
+      GamepadUIMainWindowInstance: undefined,
+      SteamUIWindows: [{ MenuStore: { GetOpenSideMenu: () => 0 } }, { MenuStore: { GetOpenSideMenu: () => 2 } }],
+    },
+  };
+  assert.equal(lp.readOpenSideMenu(), 2);
+  window.SteamUIStore = { WindowStore: { SteamUIWindows: [{ MenuStore: { GetOpenSideMenu: () => 0 } }] } };
+  assert.equal(lp.readOpenSideMenu(), 0);
+  window.SteamUIStore = oldStore;
+});
+
+test("Volume Changes is independent of notifications", async () => {
+  lp.configureMusicLowPass({ ...base, popups: true });
+  lp.lowPassForSound("deck_ui_volume.wav");
+  assert.equal(lp.shouldFilter(), false, "a volume change is not a notification");
+  await tick(5000); // the volume change above is over
+  lp.configureMusicLowPass({ ...base, volume: true });
+  lp.lowPassForSound("deck_ui_toast.wav");
+  assert.equal(lp.shouldFilter(), false, "a notification is not a volume change");
+  lp.lowPassForSound("deck_ui_volume.wav");
+  assert.equal(lp.shouldFilter(), true);
+  lp.configureMusicLowPass(base);
+  await tick(5000);
 });

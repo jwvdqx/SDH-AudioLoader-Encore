@@ -53,6 +53,24 @@ export function resumeFor(music: string): { file: string; time: number } | null 
   return { file: position.file, time: position.time };
 }
 
+// A remembered place this close to the end of the song counts as "the song was over"
+const END_MARGIN_S = 2;
+
+/** What to do with a remembered place once the song's length is known. */
+export function resumePlan(at: number, length: number): "seek" | "next" | "start" {
+  if (!(at > 0)) return "start";
+  if (!(length > 0)) return "seek";
+  return at < length - END_MARGIN_S ? "seek" : "next";
+}
+
+/**
+ * A player that was reset (for example by the Deck sleeping) reports second 0. That must not replace a
+ * good place remembered for the same song.
+ */
+export function keepsOldPosition(old: Position | null, next: Position): boolean {
+  return !!old && old.music === next.music && old.file === next.file && next.time < 1 && old.time >= 1;
+}
+
 export function rememberPosition(p: Position | null, save = false): void {
   if (!p) return;
   position = p;
@@ -85,7 +103,9 @@ export function rememberedPosition(): Position | null {
 /** Saves where the music is right now (before a game, when the plugin is unloaded). */
 export function savePositionNow(el: any, music: string): void {
   if (!continuousOn()) return;
-  rememberPosition(positionOf(el, music), true);
+  const p = positionOf(el, music);
+  if (!p || keepsOldPosition(position, p)) return;
+  rememberPosition(p, true);
 }
 
 /** Keeps the place up to date while music plays. Returns a function that stops it. */

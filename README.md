@@ -54,7 +54,14 @@ Every track of the Steam soundtracks you own and have downloaded (all library dr
 **Sound Pack**, **Sound Volume**, **Normalize Sound Effect Volume** (with a limiter, so boosted packs do not distort) and a **Library** button.
 
 ### Effects: Muffled Music (low-pass filter)
-The menu music is smoothly muffled while: **Menus** (Steam menu, Quick Access, or both), **Game Loading** (until the game has started and the music has stopped), **Pop-ups and Notifications** (all, or all but Encore's own Now Playing), **Volume and Microphone** (for a moment after a change; the microphone part is experimental). **Filter Strength** sets how muffled. Only Encore's music is filtered.
+The menu music is smoothly muffled while:
+- **Menus**: the Steam menu, Quick Access, both, or **All menus** (also the power menu, the Options (≡) menus and any other menu on top of the screen; the on-screen keyboard and the volume indicator do not count).
+- **Game Loading**: until the game has started and the music has stopped.
+- **Pop-ups and Notifications**: dialogs, and for 3 seconds after a notification sound (all, or all but Encore's own Now Playing). The same list of notification sounds and the same 3 seconds are used by **Lower the Music For: Notifications**.
+- **Volume Changes**: while you change the volume and a moment after. Separate from notifications: the volume indicator never counts as a pop-up or notification.
+- **Microphone** (experimental): a moment after the microphone is switched on or off.
+
+**Filter Strength** sets how muffled. Only Encore's music is filtered. The menus are read in Gaming Mode and in Big Picture Mode on the desktop.
 
 ### Library
 A summary of your packs, the **Play Stats**, and buttons to **My Packs**, **Find Music** and **Browse New Packs**.
@@ -86,9 +93,9 @@ The packs of [deckthemes.com](https://deckthemes.com): search, sort, type, and a
 
 ## How the options work together
 - **When the music starts again** (after a game, after waking, at startup): **Continuous Playback** first (the same music, from where it was), then **Time of Day** (once per part of the day), then **New Music Every Day**, then the **Play Mode**. When a song ends, the Play Mode picks what comes next.
-- The play history and the Time of Day state are saved, so switching to Desktop Mode and back does not reset them.
+- The play history and the Time of Day state are saved, so switching to Desktop Mode and back does not reset them. Settings and the place of the music are also saved the moment Steam shuts down (switching to Desktop Mode, turning off) or the Deck goes to sleep, so nothing changed just before is lost.
 - While the music goes through Encore's audio chain (Normalize Music Volume or a muffled-music option is on), stopping it takes a very short fade so it never clicks.
-- **After sleep** Encore notices the wake-up and brings the music back, and restarts it if it should play but has gone silent. It leaves it alone during games and when another plugin paused it on purpose.
+- **Resuming** (after a game, the Play button or key, a preview, sleep, or when the music went silent) always carries on from the song and second where the music was, and checks that it is really heard. When Encore's audio chain (used by Normalize Music Volume and Muffled Music) lost its sound output, for example after sleep or when the audio device changed, Encore notices that its clock stands still and replaces it with a fresh one. As a last resort it plays the music without the chain, so there is always music. It leaves the music alone during games and when it was paused on purpose.
 
 ## Good to know (disclaimers)
 - **Encore depends on Steam, SteamOS and Decky.** It reads Steam's menus, pop-ups, game launches, sleep and audio devices, and plays its music through Steam's screen. A Steam, SteamOS or Decky update can change any of that. When something stops working after an update, please open an issue with the **Copy Debug Info** text.

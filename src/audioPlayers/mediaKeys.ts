@@ -4,7 +4,8 @@ import { settings } from "../settings";
 import { GlobalState } from "../state/GlobalState";
 import { changeMenuMusic, menuMusicControl } from "./changeMenuMusic";
 import { recentMusic } from "./dailyMusic";
-import { pauseMusicSmooth, resumeMusicSmooth } from "./fade";
+import { pauseMusicSmooth } from "./fade";
+import { resumeMusic } from "./resume";
 import { endSleepTimerPause } from "./limits";
 import { skipMusic } from "./musicGuard";
 
@@ -14,7 +15,8 @@ import { skipMusic } from "./musicGuard";
 // work too. Encore listens to the key presses in Steam's windows, and also offers the actions to the
 // browser's media session (some systems send media keys that way instead).
 
-export type MediaAction = "next" | "previous" | "playpause" | "stop";
+// "playpause" toggles (the Play/Pause key). "play" and "pause" are explicit and never flip the music the other way.
+export type MediaAction = "next" | "previous" | "playpause" | "play" | "pause" | "stop";
 
 const KEY_ACTIONS: Record<string, MediaAction> = {
   MediaTrackNext: "next",
@@ -22,8 +24,8 @@ const KEY_ACTIONS: Record<string, MediaAction> = {
   MediaTrackPrevious: "previous",
   MediaPreviousTrack: "previous",
   MediaPlayPause: "playpause",
-  MediaPlay: "playpause",
-  MediaPause: "playpause",
+  MediaPlay: "play",
+  MediaPause: "pause",
   MediaStop: "stop",
 };
 
@@ -77,14 +79,20 @@ export function startMediaKeys(state: GlobalState): () => void {
       changeMenuMusic(back, s.menuMusic, state.setGlobalState.bind(state), s.gamesRunning, s.soundPacks, s.musicVolume);
     } else {
       const el = s.menuMusic;
-      if (!el) return;
-      if (el.paused && action === "playpause") {
-        menuMusicControl.pausedByOtherPlugin = false;
+      const stopped = !el || el.paused || el.ended;
+      const wantPlay = action === "play" || (action === "playpause" && stopped);
+      if (wantPlay) {
+        // Already playing: nothing to do (an explicit "play" must not pause the music)
+        if (!stopped) return;
         if (menuMusicControl.pausedByLimit === "sleepTimer") endSleepTimerPause(state);
-        Promise.resolve(resumeMusicSmooth(el)).catch(() => {});
-      } else if (!el.paused) {
-        // Paused on purpose: the music guard must not start it again
+        // Carries on where it was, and checks that it is heard (see resume.ts)
+        void resumeMusic(state, "media key");
+      } else if (el && !el.paused) {
+        // Paused on purpose: the music guard must not start it again. A pause that came through the
+        // browser's media session may be the system's own (it can send one while the Deck goes to
+        // sleep), so waking up does not count it as a decision (see musicGuard.ts).
         menuMusicControl.pausedByOtherPlugin = true;
+        menuMusicControl.pausedByMediaSession = source === "media session";
         pauseMusicSmooth(el);
       }
     }
@@ -123,8 +131,8 @@ export function startMediaKeys(state: GlobalState): () => void {
   const handlers: [string, MediaAction][] = [
     ["nexttrack", "next"],
     ["previoustrack", "previous"],
-    ["play", "playpause"],
-    ["pause", "playpause"],
+    ["play", "play"],
+    ["pause", "pause"],
     ["stop", "stop"],
   ];
   for (const w of Array.from(windows)) {

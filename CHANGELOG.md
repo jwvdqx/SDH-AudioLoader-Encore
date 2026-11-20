@@ -2,6 +2,68 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 2.0.3
+
+### Added
+- **Muffled Music > Menus > All menus**: also the power menu, the Options (≡) menus and any other menu or
+  overlay on top of the screen. Encore reads which part of the screen has the controller (Steam's focus
+  system): pages of the main screen do not count, and neither do the on-screen keyboard or the volume
+  indicator. Each new kind of menu is written once to the Decky log, to help when one is not recognised.
+
+### Changed
+- **Volume Changes** is its own switch (it was combined with the microphone) and is independent of
+  notifications: the volume indicator never counts as a pop-up or notification, and a notification never
+  counts as a volume change. **Microphone (experimental)** is its own switch too.
+- **Notifications**: muffling and "Lower the Music For: Notifications" now use the same list of sounds and
+  the same length (3 seconds; before, 3.5 and 2.2 seconds), so they start and end together.
+- **Desktop Mode**: the Steam menu and Quick Access are also read from Big Picture's window (not only Gaming
+  Mode's), and settings and the place of the music are saved the moment Steam shuts down (switching to
+  Desktop Mode, turning off) or the Deck goes to sleep, so they carry over.
+
+## 2.0.2
+
+**Resuming the music is reliable now:** after pausing, after a game, after sleep, after a preview, and when
+the audio device changes.
+
+### Fixed
+- **The real cause of music that did not come back.** With Normalize Music Volume or Muffled Music on, the
+  music plays through Encore's audio chain. When that chain's sound output died (after sleep, or when the audio
+  device changed), every player connected to it stayed silent, even a brand new one: restarting the player
+  (what 1.x and 2.0.1 did) built a new player on the same dead chain, again and again, until the guard gave
+  up. Now Encore checks the chain's clock (it only moves while the sound output really takes the music), and
+  when it stands still, the chain is replaced by a fresh one before the music continues.
+- **One way to resume, everywhere.** After a game, the Play button, the media keys, the end of a Find Music
+  preview, Battery Saver / Sleep Timer, and the music guard (after sleep, or when the music went silent) all go
+  through the same steps: find the place to carry on from (the song and second where the music was; a player
+  the Deck reset to 0 does not replace a remembered place; a place is never carried to another pack), make
+  sure the audio chain is alive, try the same player, and check that the music is really heard. If not: a new
+  player at the same place, then again on a fresh chain, and as a last resort without the chain (Normalize and
+  Muffled Music pause until Encore restarts), so there is always music.
+- **Audio device changes** (headphones, Bluetooth, a dock) are watched: when the chain stopped because of
+  one, the music carries on from where it was.
+- The Play button and Play media key now also work when there is no player left (they rebuild it).
+- Waiting for the audio system can no longer hang forever after sleep.
+- Includes everything from 2.0.1 (never released on its own): media session play/pause, sleep detection, the
+  remembered place no longer overwritten by a reset player, undecodable files in shuffle modes, and one list of
+  notification sounds (now with the chat and friends sounds).
+
+### Project
+- Tested in Chromium with the real code: a paused song resumes on the same player; a chain killed the way
+  sleep can kill it (suspended, and never answering) is replaced, and the music carries on from the same
+  second, twice in a row. New automatic tests for where to carry on.
+
+## 2.0.1
+
+Fixes for music that did not come back after sleep, and for Continuous Playback starting over.
+
+### Fixed
+- Media session Play and Pause are no longer treated as a toggle; a system pause during sleep no longer blocks the restart after waking.
+- `play()` after sleep can no longer keep the music guard busy forever (4 second limit).
+- After waking, a new player is always built (Continuous Playback carries on from the remembered place).
+- A player reset to second 0 no longer overwrites the remembered place; a place at the very end of a song moves on to the next music in a shuffle mode.
+- A frozen screen is no longer mistaken for the Deck sleeping; an undecodable music file no longer leaves shuffle modes silent.
+- "Lower Music For: Notifications" and "Muffled Music: Pop-ups and Notifications" share one list that now includes the chat and friends sounds (.m4a); Encore's own Now Playing sound no longer ducks the music.
+
 ## 2.0.0
 
 Spring cleaning: one look everywhere, fewer and clearer settings, and music that carries on.

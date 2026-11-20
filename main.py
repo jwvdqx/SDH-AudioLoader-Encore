@@ -31,6 +31,7 @@ starter_config_data = {
   "show_now_playing": False,
   "low_pass_steam_menu": False,
   "low_pass_quick_access": False,
+  "low_pass_other_menus": False,
   "low_pass_game_loading": False,
   "low_pass_popups": False,
   "low_pass_volume": False,

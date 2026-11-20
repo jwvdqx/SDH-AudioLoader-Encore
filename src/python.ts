@@ -18,6 +18,11 @@ export function setGlobal(key: string, value: any): void {
   globalState?.setGlobalState(key, value);
 }
 
+/** The state itself (for actions that resume or change the music). */
+export function stateClass(): GlobalState | undefined {
+  return globalState;
+}
+
 /** The live state (not a page's copy from its last redraw): use it for anything that acts on the music player. */
 export function liveState(): any {
   return globalState ? globalState.getPublicState() : {};
