@@ -2,7 +2,7 @@ import { findSP } from "decky-frontend-lib";
 import * as python from "../python";
 import { settings as appSettings } from "../settings";
 import { musicWantsGraph } from "./loudness";
-import { markOwnToast, NOTIFICATION_SOUNDS, ownToastSoundExpected } from "./notificationSounds";
+import { markOwnToast, NOTIFICATION_HOLD_MS, NOTIFICATION_SOUNDS, ownToastSoundExpected } from "./notificationSounds";
 import {
   allMusicGraphs,
   glide,
@@ -23,6 +23,8 @@ import {
 export interface MusicLowPassSettings {
   steamMenu: boolean;
   quickAccess: boolean;
+  /** Every other menu or overlay on top of the screen (the power menu, Options menus...) */
+  otherMenus?: boolean;
   gameLoading: boolean;
   popups: boolean;
   volume: boolean;
@@ -31,7 +33,7 @@ export interface MusicLowPassSettings {
   strength: number;
 }
 
-type FilterContext = "steamMenu" | "quickAccess" | "gameLoading" | "popup" | "volume" | "microphone" | "preview";
+type FilterContext = "steamMenu" | "quickAccess" | "otherMenu" | "gameLoading" | "popup" | "volume" | "microphone" | "preview";
 
 const MIN_CUTOFF_HZ = 500;
 const MAX_CUTOFF_HZ = 20000;
@@ -49,7 +51,6 @@ const PREVIEW_MS = 1500;
 // Pop-ups: Steam plays these sounds when a dialog opens and closes, and for notifications
 const POPUP_OPEN_SOUNDS = new Set(["deck_ui_show_modal.wav"]);
 const POPUP_CLOSE_SOUNDS = new Set(["deck_ui_hide_modal.wav"]);
-const NOTIFICATION_MS = 3500;
 // Volume: Steam plays this sound each time the volume is changed (volume buttons or slider).
 // The filter stays on for a moment after the last change, so it does not flutter while you press.
 const VOLUME_SOUNDS = new Set(["deck_ui_volume.wav"]);
@@ -107,6 +108,7 @@ function anyEnabled(): boolean {
   return (
     settings.steamMenu ||
     settings.quickAccess ||
+    !!settings.otherMenus ||
     settings.gameLoading ||
     settings.popups ||
     settings.volume ||
@@ -124,6 +126,7 @@ export function shouldFilter(): boolean {
   return (
     (settings.steamMenu && activeContexts.has("steamMenu")) ||
     (settings.quickAccess && activeContexts.has("quickAccess")) ||
+    (!!settings.otherMenus && activeContexts.has("otherMenu")) ||
     (settings.gameLoading && (activeContexts.has("gameLoading") || loadingHeld())) ||
     (settings.popups && activeContexts.has("popup")) ||
     (settings.volume && activeContexts.has("volume")) ||
@@ -170,6 +173,7 @@ export function configureMusicLowPass(next: Partial<MusicLowPassSettings>): void
   settings = {
     steamMenu: !!next.steamMenu,
     quickAccess: !!next.quickAccess,
+    otherMenus: !!next.otherMenus,
     gameLoading: !!next.gameLoading,
     popups: !!next.popups,
     volume: !!next.volume,
@@ -214,7 +218,7 @@ export function lowPassForSound(soundName: string): void {
   } else if (NOTIFICATION_SOUNDS.has(soundName)) {
     // The sound of Encore's own Now Playing notification does not muffle the music (when chosen)
     if (appSettings.lowpass_skip_now_playing && ownToastSoundExpected()) return;
-    notificationUntil = Date.now() + NOTIFICATION_MS;
+    notificationUntil = Date.now() + NOTIFICATION_HOLD_MS;
   } else if (VOLUME_SOUNDS.has(soundName)) {
     volumeUntil = Date.now() + VOLUME_HOLD_MS;
     checkVolume();
@@ -295,6 +299,14 @@ function dialogOnScreen(): boolean {
     // not available on this Steam version
   }
   if (typeof document !== "undefined" && !docs.includes(document)) docs.push(document);
+  for (const w of steamWindows()) {
+    try {
+      const d = w?.BrowserWindow?.document;
+      if (d && !docs.includes(d)) docs.push(d);
+    } catch {
+      // a closed window
+    }
+  }
   for (const doc of docs) {
     try {
       const found = doc.querySelectorAll(".ModalPosition, .GenericConfirmDialog");
@@ -311,7 +323,9 @@ function dialogOnScreen(): boolean {
 
 function checkPopups(lookAtScreen = true): void {
   const now = Date.now();
-  const onScreen = settings.popups && lookAtScreen ? dialogOnScreen() : lastDialogOnScreen;
+  // The volume indicator is not a pop-up: while the volume is being changed, the screen is not read
+  const volumeShowing = volumeUntil > now;
+  const onScreen = settings.popups && lookAtScreen && !volumeShowing ? dialogOnScreen() : volumeShowing ? false : lastDialogOnScreen;
   lastDialogOnScreen = onScreen;
   if (onScreen) {
     dialogSeenEver = true;
@@ -326,14 +340,98 @@ function checkPopups(lookAtScreen = true): void {
 }
 
 // Which Steam side menu is open: 0 none, 1 Steam menu, 2 Quick Access (...) menu. undefined = unknown.
-export function readOpenSideMenu(): number | undefined {
+// Steam's windows: Gaming Mode's main window, and in Desktop Mode the Big Picture window (and any other
+// Steam window that has side menus). The first one with an open side menu decides.
+function steamWindows(): any[] {
+  const out: any[] = [];
   try {
     const store = (window as any).SteamUIStore;
-    const main = store?.WindowStore?.GamepadUIMainWindowInstance;
-    const menu = main?.MenuStore ?? store?.GetFocusedWindowInstance?.()?.MenuStore;
-    if (!menu) return undefined;
-    if (typeof menu.GetOpenSideMenu === "function") return menu.GetOpenSideMenu();
-    return typeof menu.m_eOpenSideMenu === "number" ? menu.m_eOpenSideMenu : undefined;
+    const ws = store?.WindowStore;
+    const add = (w: any) => w && !out.includes(w) && out.push(w);
+    add(ws?.GamepadUIMainWindowInstance);
+    add(store?.GetFocusedWindowInstance?.());
+    for (const list of [ws?.SteamUIWindows, ws?.m_rgSteamUIWindows]) {
+      if (Array.isArray(list)) list.forEach(add);
+    }
+  } catch {
+    // not on this Steam version
+  }
+  return out;
+}
+
+export function readOpenSideMenu(): number | undefined {
+  let known: number | undefined = undefined;
+  for (const w of steamWindows()) {
+    try {
+      const menu = w?.MenuStore;
+      if (!menu) continue;
+      const open =
+        typeof menu.GetOpenSideMenu === "function"
+          ? menu.GetOpenSideMenu()
+          : typeof menu.m_eOpenSideMenu === "number"
+            ? menu.m_eOpenSideMenu
+            : undefined;
+      if (typeof open === "number") {
+        if (open !== 0) return open;
+        known = 0;
+      }
+    } catch {
+      // try the next window
+    }
+  }
+  return known;
+}
+
+/**
+ * What has the controller right now: "main" (the main screen), "keyboard" (the on-screen keyboard),
+ * "other" (a menu or overlay on top: the power menu, an Options menu, a context menu...), or null when
+ * Steam's focus system cannot be read. Each navigation tree of Steam's focus system has an id; the
+ * innermost tree that holds the focused element is the one in front.
+ */
+export function classifyFocusedTree(id: string | null | undefined): "main" | "keyboard" | "other" | null {
+  if (id === null || id === undefined) return null;
+  if (id === "root_1_" || id === "") return "main";
+  if (/keyboard/i.test(id)) return "keyboard";
+  return "other";
+}
+
+const seenTrees = new Set<string>();
+
+function focusedTreeId(): string | null | undefined {
+  try {
+    const nav: any = (window as any).GamepadNavTree?.m_context?.m_controller || (window as any).FocusNavController;
+    const ctx = nav?.m_ActiveContext || nav?.m_LastActiveContext;
+    const trees: any[] = ctx?.m_rgGamepadNavigationTrees;
+    if (!Array.isArray(trees)) return undefined;
+    // Anything inside the main screen (pages and lists have trees of their own) is the main screen:
+    // menus and overlays on top are drawn outside of it
+    const main = trees.find((t) => t?.m_ID === "root_1_")?.Root?.Element as HTMLElement | undefined;
+    const mainActive = main?.ownerDocument?.activeElement;
+    if (main && mainActive && main.contains(mainActive) && main.ownerDocument.hasFocus?.() !== false) return "root_1_";
+    let best: any = null;
+    let bestDepth = -1;
+    for (const t of trees) {
+      if (t?.m_ID === "root_1_") continue;
+      const root: HTMLElement | undefined = t?.Root?.Element;
+      const doc = root?.ownerDocument;
+      const active = doc?.activeElement;
+      if (!root || !active || !root.contains(active)) continue;
+      const rect = root.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      let depth = 0;
+      for (let e: any = root; e; e = e.parentElement) depth++;
+      if (depth > bestDepth) {
+        best = t;
+        bestDepth = depth;
+      }
+    }
+    const id = best ? String(best.m_ID ?? "") : "root_1_";
+    // Written to the log once per kind of menu, to help when a menu is not recognised
+    if (!seenTrees.has(id)) {
+      seenTrees.add(id);
+      python.logEvent(`Low-pass filter: the controller is in "${id}" (${classifyFocusedTree(id)})`);
+    }
+    return id;
   } catch {
     return undefined;
   }
@@ -385,6 +483,15 @@ export function startMusicLowPassContextMonitor(): () => void {
     }
     setContext("steamMenu", open === SIDE_MENU_MAIN);
     setContext("quickAccess", open === SIDE_MENU_QUICK_ACCESS);
+    // All other menus: something on top of the screen has the controller (not a side menu, not the
+    // on-screen keyboard, not the volume indicator)
+    if (settings.otherMenus) {
+      const kind = classifyFocusedTree(focusedTreeId());
+      const sideMenuOpen = open === SIDE_MENU_MAIN || open === SIDE_MENU_QUICK_ACCESS;
+      setContext("otherMenu", kind === "other" && !sideMenuOpen && volumeUntil <= Date.now());
+    } else {
+      setContext("otherMenu", false);
+    }
     checkPopups();
     checkVolume();
     checkMic();

@@ -2,6 +2,24 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 2.0.3
+
+### Added
+- **Muffled Music > Menus > All menus**: also the power menu, the Options (≡) menus and any other menu or
+  overlay on top of the screen. Encore reads which part of the screen has the controller (Steam's focus
+  system): pages of the main screen do not count, and neither do the on-screen keyboard or the volume
+  indicator. Each new kind of menu is written once to the Decky log, to help when one is not recognised.
+
+### Changed
+- **Volume Changes** is its own switch (it was combined with the microphone) and is independent of
+  notifications: the volume indicator never counts as a pop-up or notification, and a notification never
+  counts as a volume change. **Microphone (experimental)** is its own switch too.
+- **Notifications**: muffling and "Lower the Music For: Notifications" now use the same list of sounds and
+  the same length (3 seconds; before, 3.5 and 2.2 seconds), so they start and end together.
+- **Desktop Mode**: the Steam menu and Quick Access are also read from Big Picture's window (not only Gaming
+  Mode's), and settings and the place of the music are saved the moment Steam shuts down (switching to
+  Desktop Mode, turning off) or the Deck goes to sleep, so they carry over.
+
 ## 2.0.2
 
 **Resuming the music is reliable now:** after pausing, after a game, after sleep, after a preview, and when

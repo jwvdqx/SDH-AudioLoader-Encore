@@ -810,6 +810,7 @@ const EffectsTab: VFC = () => {
     legacyEnabled,
     lowPassSteamMenu,
     lowPassQuickAccess,
+    lowPassOtherMenus,
     lowPassGameLoading,
     lowPassPopups,
     lowPassVolume,
@@ -821,6 +822,7 @@ const EffectsTab: VFC = () => {
     patch: Partial<{
       steamMenu: boolean;
       quickAccess: boolean;
+      otherMenus: boolean;
       gameLoading: boolean;
       popups: boolean;
       volume: boolean;
@@ -831,6 +833,7 @@ const EffectsTab: VFC = () => {
     configureMusicLowPass({
       steamMenu: lowPassSteamMenu,
       quickAccess: lowPassQuickAccess,
+      otherMenus: lowPassOtherMenus,
       gameLoading: lowPassGameLoading,
       popups: lowPassPopups,
       volume: lowPassVolume,
@@ -845,21 +848,26 @@ const EffectsTab: VFC = () => {
         <Note>Muffles the menu music while one of these is active. Sounds and games are not changed.</Note>
         <Choice
           label="Menus"
-          description="While the Steam menu (Steam button) or the Quick Access (...) menu is open."
-          value={lowPassSteamMenu && lowPassQuickAccess ? "both" : lowPassSteamMenu ? "steam" : lowPassQuickAccess ? "qam" : "off"}
+          description="While a menu is open. All menus: also the power menu, the Options (≡) menus and other menus on top of the screen (the on-screen keyboard and the volume indicator do not count). Works in Gaming Mode and in Big Picture Mode on the desktop."
+          value={
+            lowPassOtherMenus ? "all" : lowPassSteamMenu && lowPassQuickAccess ? "both" : lowPassSteamMenu ? "steam" : lowPassQuickAccess ? "qam" : "off"
+          }
           options={[
             { data: "off", label: "Off" },
             { data: "steam", label: "Steam menu" },
             { data: "qam", label: "Quick Access (...)" },
-            { data: "both", label: "Both menus" },
+            { data: "both", label: "Steam menu and Quick Access" },
+            { data: "all", label: "All menus" },
           ]}
           onChange={(v) => {
-            const steamMenu = v === "steam" || v === "both";
-            const quickAccess = v === "qam" || v === "both";
+            const steamMenu = v === "steam" || v === "both" || v === "all";
+            const quickAccess = v === "qam" || v === "both" || v === "all";
+            const otherMenus = v === "all";
             setGlobalState("lowPassSteamMenu", steamMenu);
             setGlobalState("lowPassQuickAccess", quickAccess);
-            apply({ steamMenu, quickAccess });
-            python.setConfig({ low_pass_steam_menu: steamMenu, low_pass_quick_access: quickAccess });
+            setGlobalState("lowPassOtherMenus", otherMenus);
+            apply({ steamMenu, quickAccess, otherMenus });
+            python.setConfig({ low_pass_steam_menu: steamMenu, low_pass_quick_access: quickAccess, low_pass_other_menus: otherMenus });
           }}
         />
         <Toggle
@@ -889,23 +897,24 @@ const EffectsTab: VFC = () => {
             if (on) updateSetting("lowpass_skip_now_playing", v === "not_now_playing");
           }}
         />
-        <Choice
-          label="Volume and Microphone"
-          description="For a moment while you change the volume, or when the microphone is switched on or off or its volume changes (the microphone part is experimental: check Info > Show Debug Info if it does nothing)."
-          value={lowPassVolume && lowPassMicrophone ? "both" : lowPassVolume ? "volume" : lowPassMicrophone ? "mic" : "off"}
-          options={[
-            { data: "off", label: "Off" },
-            { data: "volume", label: "Volume" },
-            { data: "mic", label: "Microphone" },
-            { data: "both", label: "Both" },
-          ]}
-          onChange={(v) => {
-            const volume = v === "volume" || v === "both";
-            const microphone = v === "mic" || v === "both";
-            setGlobalState("lowPassVolume", volume);
-            setGlobalState("lowPassMicrophone", microphone);
-            apply({ volume, microphone });
-            python.setConfig({ low_pass_volume: volume, low_pass_microphone: microphone });
+        <Toggle
+          label="Volume Changes"
+          description="While you change the volume, and for a moment after. Independent of notifications: the volume indicator never counts as a pop-up or notification."
+          checked={lowPassVolume}
+          onChange={(value) => {
+            setGlobalState("lowPassVolume", value);
+            apply({ volume: value });
+            python.setConfig({ low_pass_volume: value });
+          }}
+        />
+        <Toggle
+          label="Microphone (experimental)"
+          description="For a moment when the microphone is switched on or off, or its volume changes. Check Info > Show Debug Info if it does nothing."
+          checked={lowPassMicrophone}
+          onChange={(value) => {
+            setGlobalState("lowPassMicrophone", value);
+            apply({ microphone: value });
+            python.setConfig({ low_pass_microphone: value });
           }}
         />
         <Slider

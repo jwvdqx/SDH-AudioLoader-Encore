@@ -14,6 +14,9 @@ export const NOTIFICATION_SOUNDS: ReadonlySet<string> = new Set([
   "ui_steam_smoother_friend_online.m4a",
 ]);
 
+// How long a notification lowers or muffles the music: the same for both, so they start and end together
+export const NOTIFICATION_HOLD_MS = 3000;
+
 // Encore's own Now Playing notification plays Steam's notification sound a moment after it is shown.
 // That sound is not a notification from outside: neither the muffling nor the ducking should react to it.
 export const NOW_PLAYING_SOUND_WINDOW_MS = 2500;

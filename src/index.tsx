@@ -249,6 +249,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       const oldLowPass = data?.low_pass_enabled === true;
       const configLowPassSteamMenu = data?.low_pass_steam_menu ?? (oldLowPass && data?.low_pass_steam_menus === true);
       const configLowPassQuickAccess = data?.low_pass_quick_access ?? (oldLowPass && data?.low_pass_steam_menus === true);
+      const configLowPassOtherMenus = data?.low_pass_other_menus === true;
       const configLowPassGameLoading = data?.low_pass_game_loading ?? (oldLowPass && data?.low_pass_game_launching === true);
       const configLowPassPopups = data?.low_pass_popups ?? false;
       const configLowPassVolume = data?.low_pass_volume ?? false;
@@ -270,6 +271,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       setGlobalState("showNowPlaying", configNowPlaying);
       setGlobalState("lowPassSteamMenu", configLowPassSteamMenu);
       setGlobalState("lowPassQuickAccess", configLowPassQuickAccess);
+      setGlobalState("lowPassOtherMenus", configLowPassOtherMenus);
       setGlobalState("lowPassGameLoading", configLowPassGameLoading);
       setGlobalState("lowPassPopups", configLowPassPopups);
       setGlobalState("lowPassVolume", configLowPassVolume);
@@ -278,6 +280,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       configureMusicLowPass({
         steamMenu: configLowPassSteamMenu,
         quickAccess: configLowPassQuickAccess,
+        otherMenus: configLowPassOtherMenus,
         gameLoading: configLowPassGameLoading,
         popups: configLowPassPopups,
         volume: configLowPassVolume,
@@ -443,6 +446,32 @@ export default definePlugin((serverApi: ServerAPI) => {
   const stopMusicLimits = startMusicLimits(state);
   // Continuous Playback: keeps the place of the music up to date
   const stopPositionTracker = startPositionTracker(() => state.getPublicState());
+  // Save right away when Steam shuts down (switching to Desktop Mode, turning off) or the Deck goes to
+  // sleep, so the settings and the place of the music carry over (the events exist only on some Steam
+  // versions; without them, the regular saving still works)
+  const saveNow = (why: string) => {
+    try {
+      const live = state.getPublicState();
+      savePositionNow(live.menuMusic, live.selectedMusic);
+      void python.flushConfig();
+      python.logEvent(`Saved before: ${why}`);
+    } catch {
+      // nothing to save
+    }
+  };
+  const saveHooks: any[] = [];
+  for (const [owner, name] of [
+    ["User", "RegisterForShutdownStart"],
+    ["User", "RegisterForPrepareForSystemSuspendProgress"],
+    ["System", "RegisterForOnSuspendRequest"],
+  ]) {
+    try {
+      const api = (SteamClient as any)?.[owner];
+      if (typeof api?.[name] === "function") saveHooks.push(api[name](() => saveNow(name)));
+    } catch {
+      // not on this Steam version
+    }
+  }
 
   serverApi.routerHook.addRoute("/audiopack-manager", () => (
     <GlobalStateContextProvider globalStateClass={state}>
@@ -497,6 +526,13 @@ export default definePlugin((serverApi: ServerAPI) => {
       stopMusicLowPassAudio();
       stopMusicLimits();
       stopPositionTracker();
+      for (const h of saveHooks) {
+        try {
+          h?.unregister?.();
+        } catch {
+          // already gone
+        }
+      }
       stopFx();
     },
   };

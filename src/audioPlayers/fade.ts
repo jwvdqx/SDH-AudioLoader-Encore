@@ -1,7 +1,7 @@
 import { settings } from "../settings";
 import { applyMusicVolume, musicFx } from "./loudness";
 import { musicGraphFor } from "./musicGraph";
-import { NOTIFICATION_SOUNDS, ownToastSoundExpected } from "./notificationSounds";
+import { NOTIFICATION_HOLD_MS, NOTIFICATION_SOUNDS, ownToastSoundExpected } from "./notificationSounds";
 
 // Smooth fades and "ducking" (a short volume dip) for the menu music.
 // Both work through factors on the player's volume (see applyMusicVolume), so they never fight
@@ -12,7 +12,6 @@ const FADE_OUT_MS = 700;
 const STEP_MS = 50;
 
 const DUCK_LEVEL = 0.35;
-const NOTIFICATION_HOLD_MS = 2200;
 const DEVICE_DUCK_LEVEL = 0.3;
 const DEVICE_HOLD_MS = 2500;
 // Without "Smooth Fades", a player in the music chain still gets a very short fade before it stops,

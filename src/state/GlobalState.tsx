@@ -60,6 +60,7 @@ interface PublicGlobalState {
   showNowPlaying: boolean;
   lowPassSteamMenu: boolean;
   lowPassQuickAccess: boolean;
+  lowPassOtherMenus: boolean;
   lowPassGameLoading: boolean;
   lowPassPopups: boolean;
   lowPassVolume: boolean;
@@ -172,6 +173,7 @@ export class GlobalState {
   private showNowPlaying: boolean = false;
   private lowPassSteamMenu: boolean = false;
   private lowPassQuickAccess: boolean = false;
+  private lowPassOtherMenus: boolean = false;
   private lowPassGameLoading: boolean = false;
   private lowPassPopups: boolean = false;
   private lowPassVolume: boolean = false;
@@ -221,6 +223,7 @@ export class GlobalState {
       showNowPlaying: this.showNowPlaying,
       lowPassSteamMenu: this.lowPassSteamMenu,
       lowPassQuickAccess: this.lowPassQuickAccess,
+      lowPassOtherMenus: this.lowPassOtherMenus,
       lowPassGameLoading: this.lowPassGameLoading,
       lowPassPopups: this.lowPassPopups,
       lowPassVolume: this.lowPassVolume,
