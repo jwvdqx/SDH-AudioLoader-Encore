@@ -10,7 +10,7 @@ import { waitForMovies } from "./movieWait";
 import { note } from "./stats";
 
 // Shown in the first on-screen message and in the settings, to tell which build is installed
-export const BUILD_TAG = "v2.0.0";
+export const BUILD_TAG = "v2.0.1";
 
 // Small on-screen messages that show what the music guard is doing. They are also written to the
 // Decky log. Set this to false once everything works.
@@ -29,6 +29,9 @@ const WAKE_COOLDOWN_MS = 10000;
 const WAKE_DELAY_MS = 5000;
 // How long to wait before checking whether a player really plays
 const CHECK_MS = 3000;
+// How long play() may take to answer. After sleep it can stay unanswered forever, which would keep
+// the guard busy (and so switched off) until Steam restarts.
+const PLAY_TIMEOUT_MS = 4000;
 // Pause between failed attempts
 const RETRY_GAP_MS = 5000;
 // How many times to build a new player before giving up
@@ -161,7 +164,7 @@ const isPlaying = (el: any) => !!el && !el.paused && !el.ended && el.currentTime
 
 // Gets the music playing again.
 // - "wake": the Deck just woke up. A player that looks fine can still be silent after sleep, so
-//   a brand new player is always built.
+//   a brand new player is always built (with Continuous Playback it carries on from the remembered place).
 // - "silent": the music should be playing but is not. First try plain "play", and build a new
 //   player if that does not work.
 export async function restoreMusic(state: GlobalState, reason: Reason): Promise<void> {
@@ -195,8 +198,15 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
       say("Music not restarted: Audio Loader thinks a game is running.");
       return;
     }
+    // A pause that came through the browser's media session may be the system's own (it can send one
+    // while the Deck goes to sleep). Only a pause by hand (button or key) survives the sleep.
+    if (reason === "wake" && menuMusicControl.pausedByOtherPlugin && menuMusicControl.pausedByMediaSession) {
+      menuMusicControl.pausedByOtherPlugin = false;
+      menuMusicControl.pausedByMediaSession = false;
+      say("The pause came from the media session, not from a button: restarting the music anyway.");
+    }
     if (menuMusicControl.pausedByOtherPlugin) {
-      say("Music not restarted: another plugin paused it on purpose.");
+      say("Music not restarted: it was paused on purpose (another plugin, or the pause button).");
       return;
     }
     // Waking up ends the Sleep Timer's pause. Battery Saver keeps the music paused.
@@ -258,13 +268,14 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
       return;
     }
 
-    // Step 1: if the player still exists, just press play and see if it moves (silent music, and
-    // with Continuous Playback also after waking: the player still knows where it was)
+    // Step 1: if the player still exists, just press play and see if it moves (silent music only).
+    // After waking it is not used: a player whose sound output died can still move its clock.
     const old = s.menuMusic;
-    if ((reason === "silent" || continuing) && old && !old.error && s.selectedMusic === musicToPlay) {
+    if (reason === "silent" && old && !old.error && s.selectedMusic === musicToPlay) {
       const before = old.currentTime;
       try {
-        await old.play();
+        // Never wait for play() forever
+        await Promise.race([old.play(), wait(PLAY_TIMEOUT_MS)]);
       } catch {
         // play() was refused, step 2 will build a new player
       }
@@ -296,7 +307,11 @@ export async function restoreMusic(state: GlobalState, reason: Reason): Promise<
         s.gamesRunning,
         s.soundPacks,
         s.musicVolume,
-        continuing ? resumeFor(musicToPlay) : null
+        continuing ? resumeFor(musicToPlay) : null,
+        // the music stopped at the very end of a song: in a shuffle mode the next music takes over
+        () => {
+          playRandomMusic(state);
+        }
       );
 
       await wait(CHECK_MS);
@@ -330,6 +345,13 @@ export function startMusicGuard(state: GlobalState): () => void {
   let lastTime = -1;
   let silentTicks = 0;
   let silentRestarts: number[] = [];
+  // Music files the player cannot decode (error 4). A restart cannot fix them, so in a shuffle mode the
+  // guard moves on to the next music instead of staying silent.
+  let brokenTicks = 0;
+  const brokenTried = new WeakSet<object>();
+  // The player that was playing at the previous tick, to tell a sleep from a frozen screen
+  let prevEl: any = null;
+  let prevElTime = 0;
 
   const resetWatch = () => {
     silentTicks = 0;
@@ -365,9 +387,22 @@ export function startMusicGuard(state: GlobalState): () => void {
     }
 
     const el = s.menuMusic;
+    if (el && el.error && el.error.code === 4) {
+      // bad file, a restart cannot help
+      silentTicks = 0;
+      lastTime = -1;
+      brokenTicks++;
+      if (brokenTicks >= SILENT_TICKS && !brokenTried.has(el) && s.replayRandomMusic) {
+        brokenTried.add(el);
+        brokenTicks = 0;
+        note("This music file cannot be played, moving on to the next music");
+        playRandomMusic(state);
+      }
+      return;
+    }
+    brokenTicks = 0;
     let silent = false;
     if (!el) silent = true; // no player at all
-    else if (el.error && el.error.code === 4) silent = false; // bad file, a restart cannot help
     else if (el.error || el.paused || el.ended) silent = true;
     else if (el.currentTime === lastTime) silent = true; // says "playing" but is not moving
     lastTime = el ? el.currentTime : -1;
@@ -399,7 +434,14 @@ export function startMusicGuard(state: GlobalState): () => void {
     // Timers are also slowed down while a game runs. A long gap that overlaps a game starting or
     // stopping is not a sleep, and treating it as one made the music restart again and again.
     const gameInGap = menuMusicControl.lastGameEventAt >= previousWall - TICK_MS;
-    if (wallGap - monoGap > SLEEP_EXTRA_MS || (wallGap > BIG_GAP_MS && !gameInGap)) {
+    // A busy screen (the page frozen for a while) also makes a long gap, but then the music kept playing
+    // all the time. During a real sleep it did not move.
+    const el: any = state.getPublicState().menuMusic;
+    const keptPlaying =
+      !!el && el === prevEl && !el.paused && !el.ended && el.currentTime - prevElTime >= (wallGap / 1000) * 0.5;
+    prevEl = el;
+    prevElTime = el ? el.currentTime : 0;
+    if (wallGap - monoGap > SLEEP_EXTRA_MS || (wallGap > BIG_GAP_MS && !gameInGap && !keptPlaying)) {
       resetWatch();
       trigger("wake");
       return;

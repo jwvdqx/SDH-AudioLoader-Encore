@@ -1,6 +1,7 @@
 import { Mappings, Pack } from "../classes";
 import * as python from "../python";
 import { announceMusic } from "./nowPlaying";
+import { resumePlan } from "./continuous";
 import { rememberMusic } from "./dailyMusic";
 import { applyMusicVolume, cachedMusicGain, loudnessSettings, normalizeMusic } from "./loudness";
 import { setMusicLowPassPlayer } from "./lowPass";
@@ -14,6 +15,8 @@ import { fadeInMusic, fadeOutMusic, setFadePlayer } from "./fade";
 // pausedByLimit: the music was paused on purpose by Battery Saver or the Sleep Timer (limits.ts).
 export const menuMusicControl = {
   pausedByOtherPlugin: false,
+  // The pause came through the browser's media session (it can be the system's own, sent while sleeping)
+  pausedByMediaSession: false,
   pausedByLimit: null as null | "battery" | "sleepTimer",
   waitingForMovie: false,
   lastGameEventAt: 0,
@@ -56,9 +59,12 @@ export function changeMenuMusic(
   soundPacks: Pack[],
   musicVolume: number,
   /** Continuous Playback: carry on with this file of the pack, from this second */
-  resume?: { file: string; time: number } | null
+  resume?: { file: string; time: number } | null,
+  /** Continuous Playback: called when the remembered place is the very end of the song (the song is over) */
+  onResumeAtEnd?: (() => void) | null
 ) {
   menuMusicControl.pausedByOtherPlugin = false;
+  menuMusicControl.pausedByMediaSession = false;
   // Choosing or restarting music on purpose ends a Sleep Timer pause (Battery Saver stays)
   if (menuMusicControl.pausedByLimit === "sleepTimer") menuMusicControl.pausedByLimit = null;
   setGlobalState("selectedMusic", newMusic);
@@ -124,12 +130,17 @@ export function changeMenuMusic(
         const jump = () => {
           el.removeEventListener("loadedmetadata", jump);
           const length = isFinite(el.duration) ? el.duration : 0;
-          if (at > 0 && (length === 0 || at < length - 2)) {
+          const plan = resumePlan(at, length);
+          if (plan === "seek") {
             try {
               el.currentTime = at;
             } catch {
               // starts from the beginning instead
             }
+          } else if (plan === "next" && onResumeAtEnd) {
+            // The song was over when the music stopped: the next music takes over (in Repeat mode
+            // nothing happens and the song simply starts again)
+            setTimeout(onResumeAtEnd, 0);
           }
         };
         el.addEventListener("loadedmetadata", jump);
@@ -171,6 +182,7 @@ export function changeMenuMusic(
       window.AUDIOLOADER_MENUMUSIC = {
         play: () => {
           menuMusicControl.pausedByOtherPlugin = false;
+          menuMusicControl.pausedByMediaSession = false;
           return menuMusic.play();
         },
         pause: () => {

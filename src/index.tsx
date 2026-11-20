@@ -358,7 +358,11 @@ export default definePlugin((serverApi: ServerAPI) => {
             [],
             soundPacks,
             configMusicVolume,
-            continuing ? resumeFor(musicToPlay) : null
+            continuing ? resumeFor(musicToPlay) : null,
+            // the music stopped at the very end of a song: in a shuffle mode the next music takes over
+            () => {
+              playRandomMusic(state);
+            }
           );
         if (configWaitMovie && musicToPlay !== "None") {
           // "Wait for Startup Movie": start when the movie is over, unless something else

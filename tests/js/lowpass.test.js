@@ -155,6 +155,19 @@ test("skip Now Playing: switched off, the notification muffles as before", async
   loadSettings({});
 });
 
+// ---- 2.0.1: the chat and friends sounds are notifications too ----
+
+test("pop-ups: the chat and friends sounds (.m4a) muffle the music like the toasts do", async () => {
+  lp.configureMusicLowPass({ ...base, popups: true });
+  for (const name of ["steam_chatroom_notification.m4a", "steam_at_mention.m4a", "ui_steam_smoother_friend_online.m4a"]) {
+    lp.lowPassForSound(name);
+    assert.equal(lp.shouldFilter(), true, name);
+    await tick(4000);
+    assert.equal(lp.shouldFilter(), false, `${name} ends by itself`);
+  }
+  lp.configureMusicLowPass(base);
+});
+
 // ---- 1.7: the watcher does less while the music is not playing ----
 test("while the music is paused, Steam's menu state is read only every 2 seconds", async () => {
   let reads = 0;

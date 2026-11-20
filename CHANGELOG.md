@@ -2,6 +2,18 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 2.0.1
+
+Fixes for music that did not come back after sleep, and for Continuous Playback starting over.
+
+### Fixed
+- Media session Play and Pause are no longer treated as a toggle; a system pause during sleep no longer blocks the restart after waking.
+- `play()` after sleep can no longer keep the music guard busy forever (4 second limit).
+- After waking, a new player is always built (Continuous Playback carries on from the remembered place).
+- A player reset to second 0 no longer overwrites the remembered place; a place at the very end of a song moves on to the next music in a shuffle mode.
+- A frozen screen is no longer mistaken for the Deck sleeping; an undecodable music file no longer leaves shuffle modes silent.
+- "Lower Music For: Notifications" and "Muffled Music: Pop-ups and Notifications" share one list that now includes the chat and friends sounds (.m4a); Encore's own Now Playing sound no longer ducks the music.
+
 ## 2.0.0
 
 Spring cleaning: one look everywhere, fewer and clearer settings, and music that carries on.
