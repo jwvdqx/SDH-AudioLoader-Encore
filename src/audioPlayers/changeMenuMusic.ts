@@ -1,7 +1,7 @@
 import { Mappings, Pack } from "../classes";
 import * as python from "../python";
 import { announceMusic } from "./nowPlaying";
-import { resumePlan } from "./continuous";
+import { noteSongStarted, resumePlan } from "./continuous";
 import { rememberMusic } from "./dailyMusic";
 import { applyMusicVolume, cachedMusicGain, loudnessSettings, normalizeMusic } from "./loudness";
 import { setMusicLowPassPlayer } from "./lowPass";
@@ -153,6 +153,8 @@ export function changeMenuMusic(
 
     // A resumed song is not a new play: no Now Playing message, no extra count
     if (!resumeFile) {
+      // Continuous Playback: the place now belongs to this song, from the start
+      noteSongStarted(newMusic, musicFileName);
       // Optional Encore-only Now Playing toast (separate from the persistent Now Playing card).
       announceMusic(currentPack);
       rememberMusic(currentPack?.name);

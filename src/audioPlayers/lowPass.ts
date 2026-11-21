@@ -390,7 +390,9 @@ export function readOpenSideMenu(): number | undefined {
  */
 export function classifyFocusedTree(id: string | null | undefined): "main" | "keyboard" | "other" | null {
   if (id === null || id === undefined) return null;
-  if (id === "root_1_" || id === "") return "main";
+  // "GamepadUI_Full_Root" is Gaming Mode's whole screen (the controller is there after startup and after
+  // coming back from a game or Desktop Mode): it is the main screen, not a menu on top
+  if (id === "root_1_" || id === "" || /full_root|^root_/i.test(id)) return "main";
   if (/keyboard/i.test(id)) return "keyboard";
   return "other";
 }
@@ -425,7 +427,9 @@ function focusedTreeId(): string | null | undefined {
         bestDepth = depth;
       }
     }
-    const id = best ? String(best.m_ID ?? "") : "root_1_";
+    // A tree that holds the whole main screen (Steam's full-screen roots) is the main screen too
+    const holdsMain = !!best && !!main && (best.Root?.Element as HTMLElement | undefined)?.contains?.(main);
+    const id = best && !holdsMain ? String(best.m_ID ?? "") : "root_1_";
     // Written to the log once per kind of menu, to help when a menu is not recognised
     if (!seenTrees.has(id)) {
       seenTrees.add(id);

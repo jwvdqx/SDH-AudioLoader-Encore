@@ -41,3 +41,21 @@ test("saving right away writes the place, the same place is not written twice", 
   assert.equal(saved[0].file, "song.m4a");
   loadSettings({});
 });
+
+test("at startup, a place is only used when it belongs to the music saved as selected", () => {
+  const remembered = { music: "Portal - No Cake For You", file: "a.mp3", time: 245, at: 1 };
+  assert.equal(c.startupPlace("azure tides", remembered), null, "an older song's place does not bring it back");
+  assert.deepEqual(c.startupPlace("Portal - No Cake For You", remembered), remembered);
+  assert.equal(c.startupPlace("x", null), null);
+});
+
+test("a new song is remembered from its start right away", () => {
+  saved.length = 0;
+  loadSettings({ continuous_playback: true });
+  c.noteSongStarted("azure tides", "azure.mp3");
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].music, "azure tides");
+  assert.equal(saved[0].time, 0);
+  assert.deepEqual(c.resumeFor("azure tides"), { file: "azure.mp3", time: 0 });
+  loadSettings({});
+});

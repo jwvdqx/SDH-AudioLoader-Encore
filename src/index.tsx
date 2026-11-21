@@ -38,6 +38,7 @@ import {
   startMediaKeys,
   continuousOn,
   loadPosition,
+  startupPlace,
   resumeFor,
   savePositionNow,
   startPositionTracker,
@@ -303,13 +304,16 @@ export default definePlugin((serverApi: ServerAPI) => {
       let musicToPlay = configSelectedMusic;
       let newDay = false;
       // Continuous Playback goes first: the music that played when Steam closed, from where it was
+      // Only a place that belongs to the music saved as selected (an older place from a previous song would
+      // bring that song back, and maybe at its very end)
+      const place = startupPlace(configSelectedMusic, remembered);
       const continuing =
         configLegacyEnabled &&
         settings.continuous_playback &&
-        !!remembered &&
-        soundPacks.some((p) => p.music && p.name === remembered.music);
-      if (continuing && remembered) {
-        musicToPlay = remembered.music;
+        !!place &&
+        soundPacks.some((p) => p.music && p.name === place.music);
+      if (continuing && place) {
+        musicToPlay = place.music;
         setGlobalState("selectedMusic", musicToPlay);
       }
       // "Music by Time of Day" decides first, when it has a choice for this part of the day
@@ -348,7 +352,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       note(
         `Startup music: saved="${configSelectedMusic}", legacy=${configLegacyEnabled}, daily=${configDailyRandom}, ` +
           `newDay=${newDay}, everyReplay=${configReplay}, timeOfDay=${timePick ?? "-"}, packs=${soundPacks.length}, ` +
-          `history=${loadedHistoryCount}, continuing=${continuing ? Math.round(remembered?.time || 0) + "s" : "no"}, chosen="${musicToPlay}"`
+          `history=${loadedHistoryCount}, continuing=${continuing ? Math.round(place?.time || 0) + "s" : remembered && remembered.music !== configSelectedMusic ? `no (remembered "${remembered.music}" is not the saved music)` : "no"}, chosen="${musicToPlay}"`
       );
 
       // Plays menu music initially only if legacy settings are enabled
@@ -460,6 +464,15 @@ export default definePlugin((serverApi: ServerAPI) => {
     }
   };
   const saveHooks: any[] = [];
+  // Switching to Desktop Mode closes Steam's page without Steam's shutdown event: the page closing is the
+  // last chance to save (best effort, the regular 5-second saving covers the rest)
+  const onPageClose = () => saveNow("the Steam page closing");
+  try {
+    window.addEventListener("pagehide", onPageClose);
+    window.addEventListener("beforeunload", onPageClose);
+  } catch {
+    // nothing to listen to
+  }
   for (const [owner, name] of [
     ["User", "RegisterForShutdownStart"],
     ["User", "RegisterForPrepareForSystemSuspendProgress"],
@@ -526,6 +539,12 @@ export default definePlugin((serverApi: ServerAPI) => {
       stopMusicLowPassAudio();
       stopMusicLimits();
       stopPositionTracker();
+      try {
+        window.removeEventListener("pagehide", onPageClose);
+        window.removeEventListener("beforeunload", onPageClose);
+      } catch {
+        // already gone
+      }
       for (const h of saveHooks) {
         try {
           h?.unregister?.();
