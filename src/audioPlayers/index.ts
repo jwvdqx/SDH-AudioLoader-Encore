@@ -13,3 +13,4 @@ export * from "./steamMusic";
 export * from "./mediaKeys";
 export * from "./continuous";
 export * from "./resume";
+export * from "./controllerButtons";

@@ -2,6 +2,28 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 2.0.5
+
+Controller buttons for the music, and a general check-up.
+
+### Added
+- **Controller Buttons** (Music > Playback): the Deck's own buttons control the music while you are in
+  Steam's menus. **Back buttons**: L4 previous, R4 next, R5 play/pause. **Hold L5 + D-pad**: Left previous,
+  Right next, Down play/pause. Media keys bound in Steam Input do not reach Steam's own screen in Gaming Mode,
+  so Encore now reads the buttons straight from Steam (both the newer and the older way Steam reports them,
+  and it listens again after sleep, when Steam stops sending them). Nothing to set up in Steam Input. They
+  never act during a game, and they work whatever the Media Keys setting is. Off by default.
+- Debug Info shows the Controller Buttons choice and whether Steam offers the buttons, and the Media Keys,
+  All menus and Continuous Playback settings.
+
+### Changed
+- The Media Keys description now says it is for keyboards and Bluetooth headphones, and points to
+  Controller Buttons for the Deck.
+
+### Fixed
+- Steam's shutdown and sleep listeners were not always removed when Encore was unloaded (some Steam
+  versions hand back a function instead of an object).
+
 ## 2.0.4
 
 Fixes from the Decky log of 2.0.3.

@@ -49,14 +49,23 @@ export function previousMusic(recent: string[], current: string, stepped: string
   return null;
 }
 
+// The action runner of the running watcher: the controller buttons (controllerButtons.ts) use it too, so
+// a button does exactly what the matching media key does
+let runner: ((action: MediaAction, source: string, always: boolean) => void) | null = null;
+
+/** Runs a music action from another input (the controller buttons), whatever the media keys setting is. */
+export function runMusicAction(action: MediaAction, source: string): void {
+  runner?.(action, source, true);
+}
+
 export function startMediaKeys(state: GlobalState): () => void {
   let lastAt = 0;
   let lastAction: MediaAction | null = null;
   let stepped: string[] = [];
   let lastPrevTarget = "";
 
-  const run = (action: MediaAction, source: string) => {
-    if (!settings.media_keys) return;
+  const run = (action: MediaAction, source: string, always = false) => {
+    if (!always && !settings.media_keys) return;
     const now = Date.now();
     if (action === lastAction && now - lastAt < REPEAT_MS) return;
     lastAction = action;
@@ -148,7 +157,10 @@ export function startMediaKeys(state: GlobalState): () => void {
     }
   }
 
+  runner = run;
+
   return () => {
+    runner = null;
     clearTimeout(lookAgain);
     for (const w of Array.from(windows)) w.removeEventListener("keydown", onKey, true);
     for (const ms of sessions) {
