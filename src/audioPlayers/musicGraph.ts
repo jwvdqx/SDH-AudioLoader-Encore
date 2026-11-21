@@ -248,6 +248,9 @@ function disconnect(graph: MusicGraph): void {
     // the old player may already be gone
   }
   graphs.delete(graph.element);
+  // A player that was let go is never connected again (Web Audio allows it only once: a second try fails
+  // with "already connected previously", and its sound would be lost)
+  refused.add(graph.element);
 }
 
 /**

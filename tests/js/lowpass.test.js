@@ -307,3 +307,26 @@ test("Volume Changes is independent of notifications", async () => {
   lp.configureMusicLowPass(base);
   await tick(5000);
 });
+
+test("Gaming Mode's full-screen root is the main screen, not a menu (the muffle got stuck there)", async () => {
+  assert.equal(lp.classifyFocusedTree("GamepadUI_Full_Root"), "main");
+  assert.equal(lp.classifyFocusedTree("MainNavMenuContainer"), "other");
+  // a tree that holds the main screen counts as the main screen too
+  const sc = fakeScreen();
+  const fullRoot = { m_ID: "SomeFutureRoot", Root: { Element: sc.main.parentElement } };
+  global.window = global.window || {};
+  const oldNav = window.FocusNavController;
+  const oldStore = window.SteamUIStore;
+  window.FocusNavController = { m_ActiveContext: { m_rgGamepadNavigationTrees: [...sc.trees, fullRoot] } };
+  window.SteamUIStore = { WindowStore: { GamepadUIMainWindowInstance: { MenuStore: { GetOpenSideMenu: () => 0 } } } };
+  sc.doc.hasFocus = () => false; // the focus is not inside the main screen's document check
+  sc.doc.activeElement = sc.main.parentElement; // focus on the full-screen root itself
+  lp.setMusicLowPassPlayer({ paused: false, ended: false, volume: 1 });
+  lp.configureMusicLowPass({ ...base, otherMenus: true });
+  await tick(300);
+  assert.equal(lp.shouldFilter(), false);
+  lp.configureMusicLowPass(base);
+  lp.setMusicLowPassPlayer(null);
+  window.FocusNavController = oldNav;
+  window.SteamUIStore = oldStore;
+});

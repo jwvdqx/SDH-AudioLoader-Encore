@@ -2,6 +2,23 @@
 
 All notable changes to Audio Loader Encore. Newest first.
 
+## 2.0.4
+
+Fixes from the Decky log of 2.0.3.
+
+### Fixed
+- **Muffled music stuck after a game or Desktop Mode** (with Menus: All menus). After startup and after coming
+  back, the controller sits in Gaming Mode's whole-screen root ("GamepadUI_Full_Root"), which was taken for a
+  menu on top. It now counts as the main screen, and so does any part of the screen that holds the main screen.
+- **The music went back to an older song after Desktop Mode** (Continuous Playback). Steam gives no warning
+  when it switches to Desktop Mode, and the place of the music was only saved every 15 seconds, so the place
+  could still belong to the previous song: Encore brought that song back, sometimes at its very end, so it
+  skipped right away. Now a new song is remembered from its start the moment it begins, the place is saved
+  every 5 seconds (it is a tiny file), it is also saved when Steam's page closes, and at startup a remembered
+  place is only used when it belongs to the music saved as selected.
+- "HTMLMediaElement already connected previously": a music player that was let go (while it faded out) was
+  connected to the audio chain a second time. A player that was let go is never connected again.
+
 ## 2.0.3
 
 ### Added

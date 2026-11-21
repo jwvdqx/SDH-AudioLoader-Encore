@@ -18,7 +18,9 @@ export interface Position {
 }
 
 const TRACK_MS = 5000;
-const SAVE_MS = 15000;
+// The file is tiny: written every 5 seconds at most, so a switch to Desktop Mode (Steam gives no warning
+// for it) loses at most 5 seconds
+const SAVE_MS = 5000;
 
 let position: Position | null = null;
 let savedAt = 0;
@@ -117,4 +119,19 @@ export function startPositionTracker(getState: () => any): () => void {
     if (el && !el.paused && !el.ended) rememberPosition(positionOf(el, s.selectedMusic));
   }, TRACK_MS);
   return () => clearInterval(timer);
+}
+
+/**
+ * A new song started (not a resume): remember "this song, from the start" right away, so the place always
+ * belongs to the music that plays now, even if Steam closes before the next save.
+ */
+export function noteSongStarted(music: string, file: string): void {
+  if (!continuousOn() || !music || music === "None" || !file) return;
+  rememberPosition({ music, file, time: 0, at: Date.now() }, true);
+}
+
+/** The place to use at startup: only when it belongs to the music saved as selected (that is written the
+ * moment it changes, so it is the one to trust). */
+export function startupPlace(saved: string, remembered: Position | null): Position | null {
+  return remembered && remembered.music === saved ? remembered : null;
 }
