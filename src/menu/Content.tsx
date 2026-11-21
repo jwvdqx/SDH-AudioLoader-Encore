@@ -58,6 +58,7 @@ import {
   savePositionNow,
   PLACEHOLDER_COVER,
   steamAlbums,
+  controllerButtonsMethod,
 } from "../audioPlayers";
 import * as python from "../python";
 import { notifySettingsChanged, PlayMode, PLAY_MODES, updateSetting } from "../settings";
@@ -559,9 +560,20 @@ const MusicTab: VFC<{ state: GlobalState }> = ({ state }) => {
                 if (value) savePositionNow(python.liveState().menuMusic, python.liveState().selectedMusic);
               }}
             />
+            <Choice
+              label="Controller Buttons"
+              description="The Deck's own buttons control the music while you are in Steam's menus (never in a game). Back buttons: L4 previous, R4 next, R5 play/pause. L5 + D-pad: hold L5, then Left previous, Right next, Down play/pause (the D-pad still moves around the menu too). Steam only sends these buttons to its screen in the menus; if nothing happens, check Info > Show Debug Info."
+              value={settings.controller_buttons}
+              options={[
+                { data: "off", label: "Off" },
+                { data: "back", label: "Back buttons" },
+                { data: "l5dpad", label: "Hold L5 + D-pad" },
+              ]}
+              onChange={(v) => updateSetting("controller_buttons", v)}
+            />
             <Toggle
               label="Media Keys Control the Music"
-              description="Play, Stop, Next and Prev keys pause, skip, or go back to the music before. Bind them to controller buttons in Steam Input: in a controller layout (for example Settings > Controller > Guide Button Chord Layout for Steam + a button), pick a button, then Keyboard > Numpad > Play / Stop / Next / Prev."
+              description="Play, Stop, Next and Prev keys on a keyboard (or Bluetooth headphones) pause, skip, or go back to the music before. Media keys bound in Steam Input usually do not reach Steam's own screen: use Controller Buttons above for the Deck's buttons."
               checked={settings.media_keys}
               onChange={(value) => updateSetting("media_keys", value)}
             />
@@ -1058,7 +1070,13 @@ const InfoTab: VFC<{ version: string }> = ({ version }) => {
         steamInRotation: settings.steam_music_in_rotation,
         lowPass: [g.lowPassSteamMenu, g.lowPassQuickAccess, g.lowPassGameLoading, g.lowPassPopups, g.lowPassVolume, g.lowPassMicrophone, g.lowPassStrength],
       },
-      extra: { status: limitStatusText() },
+      extra: {
+        status: limitStatusText(),
+        controllerButtons: `${settings.controller_buttons} (${controllerButtonsMethod() || "not available"})`,
+        mediaKeys: settings.media_keys,
+        lowPassOtherMenus: g.lowPassOtherMenus,
+        continuous: settings.continuous_playback,
+      },
     });
 
   const notes = formatNotes(8);

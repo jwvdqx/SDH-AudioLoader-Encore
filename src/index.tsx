@@ -36,6 +36,7 @@ import {
   stopMusicLowPassAudio,
   startMusicLowPassContextMonitor,
   startMediaKeys,
+  startControllerButtons,
   continuousOn,
   loadPosition,
   startupPlace,
@@ -446,6 +447,8 @@ export default definePlugin((serverApi: ServerAPI) => {
   const stopLowPassContextMonitor = startMusicLowPassContextMonitor();
   // Play, Stop, Next, Prev keys (also from Steam Input) control the menu music
   const stopMediaKeys = startMediaKeys(state);
+  // The Deck's own buttons (back buttons, or L5 + D-pad) control the music (see controllerButtons.ts)
+  const stopControllerButtons = startControllerButtons();
   // Battery Saver, Sleep Timer and "Soft Start for New Audio Device"
   const stopMusicLimits = startMusicLimits(state);
   // Continuous Playback: keeps the place of the music up to date
@@ -536,6 +539,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       stopMusicGuard();
       stopLowPassContextMonitor();
       stopMediaKeys();
+      stopControllerButtons();
       stopMusicLowPassAudio();
       stopMusicLimits();
       stopPositionTracker();
@@ -547,7 +551,8 @@ export default definePlugin((serverApi: ServerAPI) => {
       }
       for (const h of saveHooks) {
         try {
-          h?.unregister?.();
+          if (typeof h === "function") h();
+          else h?.unregister?.();
         } catch {
           // already gone
         }

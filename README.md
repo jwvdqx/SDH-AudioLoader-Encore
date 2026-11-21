@@ -42,7 +42,8 @@ Six tabs. Settings are grouped (groups open and close), and **Hide Descriptions*
   - **Music by Time of Day**: a pack for the morning (5:00-11:59), afternoon (12:00-17:59) and night (18:00-4:59), played once when that part of the day begins.
 - **Playback**
   - **Continuous Playback**: the music carries on where it left off after a game, after sleep, and after Steam restarts or the Deck is turned off and on. See [Good to know](#good-to-know-disclaimers).
-  - **Media Keys Control the Music**: the **Next**, **Prev**, **Play** and **Stop** keys skip, go back, pause and resume. Put them on controller buttons in Steam Input: Settings > Controller > **Guide Button Chord Layout** (Steam + a button, everywhere in Steam), pick a button, then **Keyboard > Numpad** > Play / Stop / Next / Prev. Example: Steam + R4 = Next, Steam + L4 = Play.
+  - **Controller Buttons**: the Deck's own buttons control the music while you are in Steam's menus (never in a game). **Back buttons**: L4 previous, R4 next, R5 play/pause. **Hold L5 + D-pad**: Left previous, Right next, Down play/pause. Encore reads the buttons straight from Steam, so nothing has to be set up in Steam Input. **Show Debug Info** says whether Steam offers the buttons.
+  - **Media Keys Control the Music**: the **Next**, **Prev**, **Play** and **Stop** keys of a keyboard or Bluetooth headphones skip, go back, pause and resume. Media keys bound in Steam Input usually do not reach Steam's own screen; use Controller Buttons for the Deck's buttons.
   - **Show Now Playing Notifications**, **Wait for Startup Movie**, **Smooth Fades** (equal-power crossfades, so the loudness stays even while one music fades into the next).
   - **Lower the Music For**: notifications, a new audio device (headphones, Bluetooth), both, or nothing.
 - **Battery & Sleep Timer**: **Battery Saver** (off, or pause below 10-50%) and a **Sleep Timer**.
