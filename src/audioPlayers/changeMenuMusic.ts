@@ -1,7 +1,8 @@
 import { Mappings, Pack } from "../classes";
 import * as python from "../python";
 import { announceMusic } from "./nowPlaying";
-import { noteSongStarted, resumePlan } from "./continuous";
+import { noteSongStarted } from "./continuous";
+import { freeWholeFile, seekToResume } from "./seekResume";
 import { rememberMusic } from "./dailyMusic";
 import { applyMusicVolume, cachedMusicGain, loudnessSettings, normalizeMusic } from "./loudness";
 import { setMusicLowPassPlayer } from "./lowPass";
@@ -74,8 +75,10 @@ export function changeMenuMusic(
     const old = menuMusic;
     setGlobalState("menuMusic", null);
     const stopOld = () => {
+      (old as any).alStopped = true;
       old.pause();
       old.currentTime = 0;
+      freeWholeFile(old);
     };
     if (!old.paused && !old.ended) fadeOutMusic(old, stopOld);
     else stopOld();
@@ -124,26 +127,8 @@ export function changeMenuMusic(
       newMenuMusic = new Audio(musicFilePath);
       (newMenuMusic as any).alGain = musicGain;
       if (resumeFile && resume) {
-        // Jump to the remembered second once the file's length is known (not past its end)
-        const at = resume.time;
-        const el = newMenuMusic;
-        const jump = () => {
-          el.removeEventListener("loadedmetadata", jump);
-          const length = isFinite(el.duration) ? el.duration : 0;
-          const plan = resumePlan(at, length);
-          if (plan === "seek") {
-            try {
-              el.currentTime = at;
-            } catch {
-              // starts from the beginning instead
-            }
-          } else if (plan === "next" && onResumeAtEnd) {
-            // The song was over when the music stopped: the next music takes over (in Repeat mode
-            // nothing happens and the song simply starts again)
-            setTimeout(onResumeAtEnd, 0);
-          }
-        };
-        el.addEventListener("loadedmetadata", jump);
+        // Jump to the remembered second, and check that the jump really happened (see seekResume.ts)
+        seekToResume(newMenuMusic, resume.time, resumeFile, onResumeAtEnd);
       }
       playAndLoopMenuMusic();
     }

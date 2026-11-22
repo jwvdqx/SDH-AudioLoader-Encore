@@ -32,6 +32,8 @@ export function continuousOn(): boolean {
 
 /** The file name the player is playing (the last part of its address). */
 export function fileOf(el: any): string {
+  // a whole file loaded into memory has a "blob:" address: its file name is kept on the player
+  if (el?.alFile && String(el?.src || "").startsWith("blob:")) return el.alFile;
   try {
     const src = decodeURIComponent(String(el?.src || ""));
     return src.split("?")[0].split("/").pop() || "";
@@ -44,7 +46,8 @@ export function fileOf(el: any): string {
 export function positionOf(el: any, music: string): Position | null {
   if (!el || !music || music === "None" || el.alIntro) return null;
   const file = fileOf(el);
-  const time = Number(el.currentTime) || 0;
+  // while the jump to the remembered second is on its way, the place stays that second (see seekResume.ts)
+  const time = typeof el.alResumeAt === "number" ? el.alResumeAt : Number(el.currentTime) || 0;
   if (!file) return null;
   return { music, file, time, at: Date.now() };
 }
