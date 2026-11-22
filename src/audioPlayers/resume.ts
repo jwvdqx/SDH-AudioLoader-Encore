@@ -38,7 +38,7 @@ export function placeToResume(old: any, music: string, remembered: Position | nu
   const rememberedHere = remembered && remembered.music === music && remembered.time > 0 ? remembered : null;
   if (old && old.alMusic === music && !old.alIntro) {
     const file = fileOf(old);
-    const time = Number(old.currentTime) || 0;
+    const time = typeof old.alResumeAt === "number" ? old.alResumeAt : Number(old.currentTime) || 0;
     if (file) {
       if (time < 1 && rememberedHere && rememberedHere.file === file) return { file, time: rememberedHere.time };
       if (time > 0) return { file, time };
